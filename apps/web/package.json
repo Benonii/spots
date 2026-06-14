@@ -3,8 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "TanStack Router SPA — placeholder. Real init lands when the frontend design is provided.",
+  "description": "TanStack Router SPA — browse Addis date spots from the spots table.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "@date-finder/db": "workspace:*"
+    "@supabase/supabase-js": "^2.108.1",
+    "@tanstack/react-router": "^1.170.15",
+    "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   }
 }
