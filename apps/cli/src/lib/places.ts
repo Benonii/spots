@@ -47,7 +47,15 @@ export async function geocodeVenue(query: string): Promise<GeoResult | null> {
   });
 
   if (!res.ok) {
-    throw new Error(`Places ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const body = await res.text();
+    let detail = body.slice(0, 200);
+    try {
+      const j = JSON.parse(body) as { error?: { status?: string; message?: string } };
+      if (j.error?.message) detail = `${j.error.status ?? ""} ${j.error.message}`.trim();
+    } catch {
+      /* non-JSON body — use the raw slice */
+    }
+    throw new Error(`Places ${res.status}: ${detail}`);
   }
 
   const data = (await res.json()) as { places?: PlaceResult[] };

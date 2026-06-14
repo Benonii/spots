@@ -21,6 +21,9 @@ const EnvSchema = z.object({
   LLM_API_KEY: z.string().min(1).optional(),
   GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
   SCRAPFLY_KEY: z.string().min(1).optional(),
+  // Geocode rate cap (Places Text Search starts/min). Keep under your Google
+  // per-minute quota; raise it if your quota allows, lower it if still throttled.
+  GEOCODE_RPM: z.coerce.number().int().positive().default(60),
   // Path/name of the yt-dlp binary. Override if it isn't on PATH
   // (e.g. ~/.local/bin/yt-dlp from a standalone install).
   YT_DLP_BIN: z.string().default("yt-dlp"),

@@ -36,7 +36,14 @@ export async function fetchTopComments(
     `&count=${count}&cursor=0&aid=1988`;
 
   const scraped = await getClient().scrape(
-    new ScrapeConfig({ url, asp: true, country: "us", render_js: false }),
+    new ScrapeConfig({
+      url,
+      asp: true,
+      country: "us",
+      render_js: false,
+      // SDK defaults this to true and warns once per call when no session is set.
+      session_sticky_proxy: false,
+    }),
   );
   // scrape() can return a Response for async/webhook configs; ours is sync.
   if (!(scraped instanceof ScrapeResult)) {

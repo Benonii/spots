@@ -13,10 +13,12 @@ import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import pLimit from "p-limit";
 import type { GeoResult } from "@date-finder/db";
 import { db, schema } from "../db.ts";
-import { requireKeys } from "../env.ts";
+import { getEnv, requireKeys } from "../env.ts";
 import { geocodeVenue } from "../lib/places.ts";
+import { rateLimiter } from "../lib/throttle.ts";
 
 const CONCURRENCY = 5;
+const QUOTA_RE = /RESOURCE_EXHAUSTED|Quota exceeded|Places 429/i;
 
 export const geocodeCommand = defineCommand({
   meta: {
@@ -56,18 +58,28 @@ export const geocodeCommand = defineCommand({
       consola.info("No venues to geocode.");
       return;
     }
-    consola.info(`Geocoding ${videos.length} venues (concurrency ${CONCURRENCY})…`);
+    const rpm = getEnv().GEOCODE_RPM;
+    consola.info(
+      `Geocoding ${videos.length} venues (concurrency ${CONCURRENCY}, ${rpm}/min)…`,
+    );
 
     // Within-run cache: identical query string → one Places call.
     const cache = new Map<string, Promise<GeoResult | null>>();
+    const gate = rateLimiter(rpm); // keep under Places' per-minute quota
     const run = pLimit(CONCURRENCY);
     let resolved = 0;
     let notFound = 0;
     let failed = 0;
+    let skipped = 0;
+    let quotaHit = false; // circuit breaker: stop hammering once quota is exhausted
 
     await Promise.all(
       videos.map((v) =>
         run(async () => {
+          if (quotaHit) {
+            skipped++;
+            return; // leaves geocoded_at null → retried on the next run
+          }
           const ex = v.extraction!;
           const query = [ex.venueName, ex.neighborhood, "Addis Ababa"]
             .filter(Boolean)
@@ -75,7 +87,7 @@ export const geocodeCommand = defineCommand({
           try {
             let pending = cache.get(query);
             if (!pending) {
-              pending = geocodeVenue(query);
+              pending = gate().then(() => geocodeVenue(query));
               cache.set(query, pending);
             }
             const geo = await pending;
@@ -95,6 +107,12 @@ export const geocodeCommand = defineCommand({
             const reason =
               (e as Error).message.trim().split("\n").filter(Boolean).pop() ??
               "unknown error";
+            if (!quotaHit && QUOTA_RE.test(reason)) {
+              quotaHit = true;
+              consola.warn(
+                "Places quota exhausted — stopping geocode. Raise your Google quota (or lower GEOCODE_RPM) and re-run; unprocessed venues retry automatically.",
+              );
+            }
             consola.warn(`  ${ex.venueName} failed: ${reason}`);
           }
         }),
@@ -102,7 +120,8 @@ export const geocodeCommand = defineCommand({
     );
 
     consola.success(
-      `Geocoded: ${resolved} resolved, ${notFound} no match, ${failed} failed`,
+      `Geocoded: ${resolved} resolved, ${notFound} no match, ${failed} failed` +
+        (skipped ? `, ${skipped} skipped (quota)` : ""),
     );
   },
 });
