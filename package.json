@@ -1,0 +1,13 @@
+{
+  "name": "date-finder",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "df": "bun apps/cli/src/index.ts",
+    "db:generate": "bun run --filter @date-finder/db generate",
+    "db:migrate": "bun run --filter @date-finder/db migrate",
+    "db:push": "bun run --filter @date-finder/db push",
+    "typecheck": "bun run --filter '*' typecheck"
+  }
+}

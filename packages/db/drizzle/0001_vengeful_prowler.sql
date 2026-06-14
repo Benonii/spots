@@ -1,0 +1,2 @@
+ALTER TABLE "source_videos" ADD COLUMN "comments_scraped_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "source_videos_uncommented_idx" ON "source_videos" USING btree ("comments_scraped_at") WHERE "source_videos"."comments_scraped_at" is null;

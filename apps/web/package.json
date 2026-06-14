@@ -1,0 +1,10 @@
+{
+  "name": "@date-finder/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TanStack Router SPA — placeholder. Real init lands when the frontend design is provided.",
+  "dependencies": {
+    "@date-finder/db": "workspace:*"
+  }
+}
