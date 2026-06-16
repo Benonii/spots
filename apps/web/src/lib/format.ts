@@ -32,3 +32,9 @@ export function coverImage(spot: Spot): string {
   const grad = COVERS[hash(spot.google_place_id) % COVERS.length]!;
   return spot.cover_image_url ? `url("${spot.cover_image_url}"), ${grad}` : grad;
 }
+
+/** Google Maps deep link to the spot's exact place (by place_id). */
+export function mapsUrl(spot: Spot): string {
+  const q = encodeURIComponent(spot.name);
+  return `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=${spot.google_place_id}`;
+}

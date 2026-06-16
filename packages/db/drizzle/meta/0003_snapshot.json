@@ -1,0 +1,564 @@
+{
+  "id": "294977f9-85f8-46f7-a05c-9b2914499c0a",
+  "prevId": "c5817e62-b119-44d1-8abd-5e5451d77650",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.channels": {
+      "name": "channels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'tiktok'"
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "last_scraped_at": {
+          "name": "last_scraped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "channels_handle_unique": {
+          "name": "channels_handle_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "handle"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.source_videos": {
+      "name": "source_videos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spot_id": {
+          "name": "spot_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_video_id": {
+          "name": "platform_video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caption": {
+          "name": "caption",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hashtags": {
+          "name": "hashtags",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "view_count": {
+          "name": "view_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "like_count": {
+          "name": "like_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comment_count": {
+          "name": "comment_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "share_count": {
+          "name": "share_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "posted_at": {
+          "name": "posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thumbnail_url": {
+          "name": "thumbnail_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_comments": {
+          "name": "top_comments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "comments_scraped_at": {
+          "name": "comments_scraped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extraction": {
+          "name": "extraction",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo": {
+          "name": "geo",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geocoded_at": {
+          "name": "geocoded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scraped_at": {
+          "name": "scraped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "normalized_at": {
+          "name": "normalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "source_videos_spot_idx": {
+          "name": "source_videos_spot_idx",
+          "columns": [
+            {
+              "expression": "spot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "source_videos_unnormalized_idx": {
+          "name": "source_videos_unnormalized_idx",
+          "columns": [
+            {
+              "expression": "normalized_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"source_videos\".\"normalized_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "source_videos_uncommented_idx": {
+          "name": "source_videos_uncommented_idx",
+          "columns": [
+            {
+              "expression": "comments_scraped_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"source_videos\".\"comments_scraped_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "source_videos_ungeocoded_idx": {
+          "name": "source_videos_ungeocoded_idx",
+          "columns": [
+            {
+              "expression": "geocoded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"source_videos\".\"geocoded_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "source_videos_channel_id_channels_id_fk": {
+          "name": "source_videos_channel_id_channels_id_fk",
+          "tableFrom": "source_videos",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "source_videos_spot_id_spots_id_fk": {
+          "name": "source_videos_spot_id_spots_id_fk",
+          "tableFrom": "source_videos",
+          "tableTo": "spots",
+          "columnsFrom": [
+            "spot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "source_videos_platform_video_id_unique": {
+          "name": "source_videos_platform_video_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "platform_video_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.spots": {
+      "name": "spots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "google_place_id": {
+          "name": "google_place_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "neighborhood": {
+          "name": "neighborhood",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lat": {
+          "name": "lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lng": {
+          "name": "lng",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_min": {
+          "name": "price_min",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_max": {
+          "name": "price_max",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_currency": {
+          "name": "price_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ETB'"
+        },
+        "price_basis": {
+          "name": "price_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "price_level": {
+          "name": "price_level",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality_score": {
+          "name": "quality_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "quality_signals": {
+          "name": "quality_signals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "video_count": {
+          "name": "video_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "cover_image_url": {
+          "name": "cover_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_video_url": {
+          "name": "source_video_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "spots_quality_idx": {
+          "name": "spots_quality_idx",
+          "columns": [
+            {
+              "expression": "quality_score",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "spots_price_level_idx": {
+          "name": "spots_price_level_idx",
+          "columns": [
+            {
+              "expression": "price_level",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "spots_neighborhood_idx": {
+          "name": "spots_neighborhood_idx",
+          "columns": [
+            {
+              "expression": "neighborhood",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "spots_tags_idx": {
+          "name": "spots_tags_idx",
+          "columns": [
+            {
+              "expression": "tags",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "spots_google_place_id_unique": {
+          "name": "spots_google_place_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "google_place_id"
+          ]
+        }
+      },
+      "policies": {
+        "public read spots": {
+          "name": "public read spots",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "anon"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "spots_price_basis_check": {
+          "name": "spots_price_basis_check",
+          "value": "\"spots\".\"price_basis\" in ('per_person','total','unknown')"
+        },
+        "spots_price_level_check": {
+          "name": "spots_price_level_check",
+          "value": "\"spots\".\"price_level\" between 1 and 4"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

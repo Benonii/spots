@@ -140,6 +140,9 @@ export const spots = pgTable(
     summary: text("summary"),
     videoCount: integer("video_count").notNull().default(0),
     coverImageUrl: text("cover_image_url"),
+    sourceVideoUrl: text("source_video_url"), // representative (top) video link
+
+
 
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()

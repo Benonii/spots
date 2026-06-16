@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Fuse from "fuse.js";
 import type { Spot, VisitedEntry } from "./lib/types";
 import { fetchSpots } from "./lib/supabase";
 import { loadVisited, saveVisited } from "./lib/visited";
+import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { Dropdown, type Option } from "./components/Dropdown";
 import { SpotCard } from "./components/SpotCard";
 import { VisitedTable } from "./components/VisitedTable";
@@ -35,6 +37,8 @@ export function App() {
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [query, setQuery] = useState("");
+  const [categories, setCategories] = useState<Set<string>>(new Set());
   const [area, setArea] = useState("All areas");
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
@@ -67,17 +71,29 @@ export function App() {
     return ["All areas", ...Array.from(new Set(names)).sort()];
   }, [spots]);
 
+  const fuse = useMemo(
+    () =>
+      new Fuse(spots ?? [], {
+        keys: ["name", "summary", "neighborhood", "tags"],
+        threshold: 0.4,
+        ignoreLocation: true,
+      }),
+    [spots],
+  );
+
   const filtered = useMemo(() => {
-    let list = (spots ?? []).slice();
+    const q = query.trim();
+    let list: Spot[] = q ? fuse.search(q).map((r) => r.item) : (spots ?? []).slice();
     if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
+    if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
     return list.sort(COMPARATORS[sort] ?? COMPARATORS.quality);
-  }, [spots, area, price, sort]);
+  }, [spots, fuse, query, area, price, categories, sort]);
 
   // reset position when the filter set changes
   useEffect(() => {
     setIndex(0);
-  }, [area, price, sort]);
+  }, [area, price, sort, query, categories]);
 
   const total = filtered.length;
   const current: Spot | null = total
@@ -131,6 +147,22 @@ export function App() {
 
   const removeVisited = useCallback((placeId: string) => {
     setVisited((prev) => prev.filter((v) => v.placeId !== placeId));
+  }, []);
+
+  const toggleCategory = useCallback((key: string) => {
+    setCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setArea("All areas");
+    setPrice("any");
+    setQuery("");
+    setCategories(new Set());
   }, []);
 
   // keyboard arrows
@@ -187,6 +219,16 @@ export function App() {
       </header>
 
       <section className="controls">
+        <div className="ctrl ctrl-search">
+          <label>Search</label>
+          <input
+            className="search-input"
+            type="text"
+            placeholder="rooftop coffee, quiet date…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         <div className="ctrl">
           <label>Area</label>
           <Dropdown
@@ -209,6 +251,18 @@ export function App() {
         </button>
       </section>
 
+      <section className="cat-chips">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.key}
+            className={"cat-chip" + (categories.has(c.key) ? " on" : "")}
+            onClick={() => toggleCategory(c.key)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </section>
+
       {current ? (
         <SpotCard
           spot={current}
@@ -222,14 +276,7 @@ export function App() {
       ) : (
         <div className="noresults">
           No spots match these filters.{" "}
-          <button
-            onClick={() => {
-              setArea("All areas");
-              setPrice("any");
-            }}
-          >
-            Clear filters
-          </button>
+          <button onClick={clearFilters}>Clear filters</button>
         </div>
       )}
 

@@ -35,6 +35,7 @@ export type Spot = {
   summary: string | null;
   video_count: number;
   cover_image_url: string | null;
+  source_video_url: string | null;
   first_seen_at: string;
 };
 

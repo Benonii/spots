@@ -25,6 +25,7 @@ export const upsertCommand = defineCommand({
         geo: schema.sourceVideos.geo,
         likeCount: schema.sourceVideos.likeCount,
         thumbnailUrl: schema.sourceVideos.thumbnailUrl,
+        url: schema.sourceVideos.url,
       })
       .from(schema.sourceVideos)
       .where(isNotNull(schema.sourceVideos.geo));
@@ -77,6 +78,7 @@ export const upsertCommand = defineCommand({
         summary: agg.summary,
         videoCount: agg.videoCount,
         coverImageUrl: best.thumbnailUrl,
+        sourceVideoUrl: best.url,
         updatedAt: new Date(),
       };
 
