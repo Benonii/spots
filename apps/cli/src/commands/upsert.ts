@@ -11,6 +11,7 @@ import { consola } from "consola";
 import { inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "../db.ts";
 import { aggregateSpot, type VideoForAgg } from "../aggregate.ts";
+import { ensureCoversBucket, rehostCover, storageConfigured } from "../lib/storage.ts";
 
 export const upsertCommand = defineCommand({
   meta: {
@@ -45,6 +46,17 @@ export const upsertCommand = defineCommand({
 
     consola.info(`Upserting ${groups.size} spots from ${rows.length} videos…`);
 
+    // Re-host cover thumbnails into Storage so they don't expire (best-effort:
+    // if Storage isn't configured we keep the raw TikTok URL).
+    const useStorage = storageConfigured();
+    if (useStorage) {
+      try {
+        await ensureCoversBucket();
+      } catch (e) {
+        consola.warn(`Storage unavailable, keeping raw cover URLs: ${(e as Error).message}`);
+      }
+    }
+
     let upserted = 0;
     for (const [placeId, group] of groups) {
       const videos: VideoForAgg[] = group.map((r) => ({
@@ -59,6 +71,16 @@ export const upsertCommand = defineCommand({
       )[0]!;
       const geo = best.geo!;
       const name = best.extraction!.venueName ?? "Unknown";
+
+      let coverImageUrl = best.thumbnailUrl;
+      if (useStorage) {
+        try {
+          const hosted = await rehostCover(placeId, best.thumbnailUrl);
+          if (hosted) coverImageUrl = hosted;
+        } catch (e) {
+          consola.warn(`  cover re-host failed for ${name}: ${(e as Error).message}`);
+        }
+      }
 
       const values = {
         googlePlaceId: placeId,
@@ -77,7 +99,7 @@ export const upsertCommand = defineCommand({
         tags: agg.tags,
         summary: agg.summary,
         videoCount: agg.videoCount,
-        coverImageUrl: best.thumbnailUrl,
+        coverImageUrl,
         sourceVideoUrl: best.url,
         updatedAt: new Date(),
       };

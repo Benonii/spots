@@ -21,6 +21,11 @@ const EnvSchema = z.object({
   LLM_API_KEY: z.string().min(1).optional(),
   GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
   SCRAPFLY_KEY: z.string().min(1).optional(),
+  // Supabase project URL + secret (service-role) key — used to re-host TikTok
+  // cover thumbnails into Storage (their CDN URLs are signed and expire in days).
+  // Secret key bypasses RLS; CLI-only, never exposed to the browser.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
   // Geocode rate cap (Places Text Search starts/min). Keep under your Google
   // per-minute quota; raise it if your quota allows, lower it if still throttled.
   GEOCODE_RPM: z.coerce.number().int().positive().default(60),

@@ -15,6 +15,7 @@ import { commentsCommand } from "./commands/comments.ts";
 import { normalizeCommand } from "./commands/normalize.ts";
 import { geocodeCommand } from "./commands/geocode.ts";
 import { upsertCommand } from "./commands/upsert.ts";
+import { coversCommand } from "./commands/covers.ts";
 import { ingestCommand } from "./commands/ingest.ts";
 import {
   migrateCommand,
@@ -34,6 +35,7 @@ const main = defineCommand({
     normalize: normalizeCommand,
     geocode: geocodeCommand,
     upsert: upsertCommand,
+    covers: coversCommand,
     ingest: ingestCommand,
     migrate: migrateCommand,
     generate: generateCommand,
