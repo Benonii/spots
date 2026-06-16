@@ -10,7 +10,7 @@ if (!url || !key) {
   );
 }
 
-const supabase = createClient(url, key);
+export const supabase = createClient(url, key);
 
 const EMPTY_SIGNALS: QualitySignals = {
   dimensions: { aesthetic: 0, vibe: 0, food: 0, value: 0, service: 0 },

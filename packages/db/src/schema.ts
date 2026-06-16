@@ -171,6 +171,80 @@ export const spots = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* visits — our (and eventually everyone's) check-ins + opinions on a spot */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The "Places we've been" log, persisted (was localStorage-only before).
+ *
+ * `userId` is nullable on purpose: today every row is ours, written with a null
+ * user_id. Later we add auth, backfill the owner's id into the existing null
+ * rows, and let other people add their own visits/comments — so this one table
+ * cleanly splits into "where the owner has been" (our id) vs "general comments
+ * from everybody" (their ids) without a schema change.
+ *
+ * The per-dimension sliders (aesthetic/vibe/food/portions/service) are our
+ * subjective scores; null until rated. In the future these feed back into a
+ * spot's overall rating + per-dimension scores alongside the data-derived ones.
+ *
+ * SECURITY: anon insert/update/delete is open for now because there is no auth
+ * yet and the app isn't shared. When auth lands, scope these policies to
+ * `auth.uid() = user_id` (and an "owner edits the null rows" grant). Until then,
+ * do not treat this table as trusted input.
+ */
+export const visits = pgTable(
+  "visits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    googlePlaceId: text("google_place_id").notNull(), // -> spots.google_place_id
+    userId: text("user_id"), // null = ours, for now (see note above)
+    name: text("name").notNull(), // denormalized spot name for display
+    visitedAt: text("visited_at").notNull(), // ISO date 'YYYY-MM-DD'
+    rating: numeric("rating"), // overall 0..5 (stars); null = unrated
+    notes: text("notes"),
+
+    // subjective per-dimension sliders, 0..5; null = not yet given.
+    aesthetic: numeric("aesthetic"),
+    vibe: numeric("vibe"),
+    food: numeric("food"),
+    portions: numeric("portions"), // replaces "value" for our own scoring
+    service: numeric("service"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("visits_place_idx").on(t.googlePlaceId),
+    index("visits_user_idx").on(t.userId),
+    pgPolicy("public read visits", {
+      for: "select",
+      to: anonRole,
+      using: sql`true`,
+    }),
+    pgPolicy("anon insert visits", {
+      for: "insert",
+      to: anonRole,
+      withCheck: sql`true`,
+    }),
+    pgPolicy("anon update visits", {
+      for: "update",
+      to: anonRole,
+      using: sql`true`,
+      withCheck: sql`true`,
+    }),
+    pgPolicy("anon delete visits", {
+      for: "delete",
+      to: anonRole,
+      using: sql`true`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* source_videos — raw per-video provenance (CLI-internal, anon has no access) */
 /* ------------------------------------------------------------------ */
 
@@ -268,3 +342,6 @@ export type NewSpot = typeof spots.$inferInsert;
 
 export type SourceVideo = typeof sourceVideos.$inferSelect;
 export type NewSourceVideo = typeof sourceVideos.$inferInsert;
+
+export type Visit = typeof visits.$inferSelect;
+export type NewVisit = typeof visits.$inferInsert;

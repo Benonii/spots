@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
-import type { Spot, VisitedEntry } from "./lib/types";
+import type { Spot, VisitedEntry, VisitPatch } from "./lib/types";
 import { fetchSpots } from "./lib/supabase";
-import { loadVisited, saveVisited } from "./lib/visited";
+import {
+  createVisit,
+  deleteVisit,
+  deleteVisitsByPlace,
+  fetchVisits,
+  migrateLegacyVisits,
+  updateVisit,
+} from "./lib/visits";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { Dropdown, type Option } from "./components/Dropdown";
 import { SpotCard } from "./components/SpotCard";
@@ -43,7 +50,12 @@ export function App() {
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
   const [index, setIndex] = useState(0);
-  const [visited, setVisited] = useState<VisitedEntry[]>(loadVisited);
+  const [visited, setVisited] = useState<VisitedEntry[]>([]);
+  const [writeError, setWriteError] = useState<string | null>(null);
+
+  const reportWriteError = useCallback((e: unknown) => {
+    setWriteError(e instanceof Error ? e.message : String(e));
+  }, []);
 
   useEffect(() => {
     fetchSpots()
@@ -51,9 +63,23 @@ export function App() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
+  // load our visit log from the DB (importing any legacy localStorage log once)
   useEffect(() => {
-    saveVisited(visited);
-  }, [visited]);
+    fetchVisits()
+      .then(async (rows) => {
+        const migrated = await migrateLegacyVisits(rows);
+        setVisited(migrated.length ? [...migrated, ...rows] : rows);
+      })
+      .catch(reportWriteError);
+  }, [reportWriteError]);
+
+  // show a *random* spot on every page load (not just the first), once spots arrive
+  const pickedRandom = useRef(false);
+  useEffect(() => {
+    if (pickedRandom.current || !spots || !spots.length) return;
+    pickedRandom.current = true;
+    setIndex(Math.floor(Math.random() * spots.length));
+  }, [spots]);
 
   const spotsById = useMemo(
     () =>
@@ -125,29 +151,50 @@ export function App() {
 
   const toggleVisited = useCallback(() => {
     if (!current) return;
-    setVisited((prev) =>
-      prev.some((v) => v.placeId === current.google_place_id)
-        ? prev.filter((v) => v.placeId !== current.google_place_id)
-        : [
-            ...prev,
-            {
-              placeId: current.google_place_id,
-              name: current.name,
-              visitedAt: new Date().toISOString().slice(0, 10),
-              rating: 0,
-              notes: "",
-            },
-          ],
-    );
-  }, [current]);
+    const placeId = current.google_place_id;
+    if (visited.some((v) => v.placeId === placeId)) {
+      setVisited((prev) => prev.filter((v) => v.placeId !== placeId)); // optimistic
+      deleteVisitsByPlace(placeId).catch(reportWriteError);
+    } else {
+      createVisit({
+        placeId,
+        name: current.name,
+        visitedAt: new Date().toISOString().slice(0, 10),
+      })
+        .then((entry) => setVisited((prev) => [entry, ...prev]))
+        .catch(reportWriteError);
+    }
+  }, [current, visited, reportWriteError]);
 
-  const updateVisited = useCallback((placeId: string, patch: Partial<VisitedEntry>) => {
-    setVisited((prev) => prev.map((v) => (v.placeId === placeId ? { ...v, ...patch } : v)));
-  }, []);
+  // Coalesce rapid edits (slider drags, note typing) into one DB write per row.
+  const pendingPatch = useRef<Map<string, VisitPatch>>(new Map());
+  const writeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const removeVisited = useCallback((placeId: string) => {
-    setVisited((prev) => prev.filter((v) => v.placeId !== placeId));
-  }, []);
+  const updateVisited = useCallback(
+    (id: string, patch: VisitPatch) => {
+      setVisited((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v))); // optimistic
+      pendingPatch.current.set(id, { ...pendingPatch.current.get(id), ...patch });
+      clearTimeout(writeTimers.current.get(id));
+      writeTimers.current.set(
+        id,
+        setTimeout(() => {
+          const p = pendingPatch.current.get(id);
+          pendingPatch.current.delete(id);
+          writeTimers.current.delete(id);
+          if (p) updateVisit(id, p).catch(reportWriteError);
+        }, 400),
+      );
+    },
+    [reportWriteError],
+  );
+
+  const removeVisited = useCallback(
+    (id: string) => {
+      setVisited((prev) => prev.filter((v) => v.id !== id)); // optimistic
+      deleteVisit(id).catch(reportWriteError);
+    },
+    [reportWriteError],
+  );
 
   const toggleCategory = useCallback((key: string) => {
     setCategories((prev) => {
@@ -283,7 +330,13 @@ export function App() {
       <section className="visited-section">
         <div className="vs-head">
           <h3>Places we've been</h3>
-          <span className="vs-sub">{visited.length} logged · notes &amp; ratings are ours</span>
+          <span className="vs-sub">
+            {writeError ? (
+              <span className="vs-error">Couldn't sync: {writeError}</span>
+            ) : (
+              <>{visited.length} logged · saved to the cloud</>
+            )}
+          </span>
         </div>
         <VisitedTable
           visited={visited}

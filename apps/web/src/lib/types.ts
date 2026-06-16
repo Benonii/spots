@@ -39,11 +39,39 @@ export type Spot = {
   first_seen_at: string;
 };
 
-/** localStorage visited entry — schemas.md §6. */
+/**
+ * A row of the `visits` table (our "Places we've been" log), persisted to the
+ * DB. `dims` are our subjective 0..5 sliders; null = not yet rated. `userId` is
+ * null for now (ours) — see schema.ts for the launch/auth plan.
+ */
 export type VisitedEntry = {
+  id: string; // visits.id (server-assigned)
   placeId: string; // spots.google_place_id
+  userId: string | null;
   name: string;
   visitedAt: string; // ISO date
-  rating?: number; // 1..5
-  notes?: string;
+  rating: number; // 0..5 (0 = unrated)
+  notes: string;
+  aesthetic: number | null;
+  vibe: number | null;
+  food: number | null;
+  portions: number | null;
+  service: number | null;
 };
+
+/** The editable subset of a visit — maps 1:1 to `visits` columns. */
+export type VisitPatch = Partial<
+  Pick<
+    VisitedEntry,
+    "rating" | "notes" | "aesthetic" | "vibe" | "food" | "portions" | "service"
+  >
+>;
+
+/** Our subjective slider dimensions (note: "portions" replaces "value"). */
+export const VISIT_DIMS = [
+  ["aesthetic", "Aesthetic"],
+  ["vibe", "Vibe"],
+  ["food", "Food"],
+  ["portions", "Portions"],
+  ["service", "Service"],
+] as const;
