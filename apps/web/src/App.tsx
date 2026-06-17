@@ -41,6 +41,26 @@ const COMPARATORS: Record<string, (a: Spot, b: Spot) => number> = {
     new Date(b.first_seen_at).getTime() - new Date(a.first_seen_at).getTime(),
 };
 
+function SearchIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M13 13l-2.7-2.7" />
+    </svg>
+  );
+}
+
+function ChevIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }}>
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
+
 export function App() {
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +70,10 @@ export function App() {
   const [area, setArea] = useState("All areas");
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  const chipsRef = useRef<HTMLElement>(null);
+  const [chipFade, setChipFade] = useState({ left: false, right: false });
   const [visited, setVisited] = useState<VisitedEntry[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
 
@@ -213,6 +236,33 @@ export function App() {
     setCategories(new Set());
   }, []);
 
+  const activeFilters =
+    (query.trim() ? 1 : 0) +
+    (area !== "All areas" ? 1 : 0) +
+    (price !== "any" ? 1 : 0) +
+    categories.size;
+
+  // edge fades on the category row signal there's more to scroll (mobile)
+  const updateChipFade = useCallback(() => {
+    const el = chipsRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setChipFade((p) => (p.left === left && p.right === right ? p : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    const el = chipsRef.current;
+    if (!el) return;
+    updateChipFade();
+    el.addEventListener("scroll", updateChipFade, { passive: true });
+    window.addEventListener("resize", updateChipFade);
+    return () => {
+      el.removeEventListener("scroll", updateChipFade);
+      window.removeEventListener("resize", updateChipFade);
+    };
+  }, [updateChipFade, spots]);
+
   // keyboard arrows
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -266,6 +316,30 @@ export function App() {
         </div>
       </header>
 
+      <div className="filtermenu">
+        {filtersOpen && (
+          <div className="filter-scrim" onClick={() => setFiltersOpen(false)} aria-hidden="true" />
+        )}
+        <div className="filtertop">
+          <button
+            className="filterbar"
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+          >
+            <span className="filterbar-label">
+              <SearchIcon /> Search &amp; filters
+              {activeFilters > 0 && <span className="filterbar-badge">{activeFilters}</span>}
+            </span>
+            <ChevIcon open={filtersOpen} />
+          </button>
+          <span className="surprise-wrap surprise-mobile">
+            <DiceButton onClick={surprise} />
+          </span>
+        </div>
+
+        <div className={"filters-collapse" + (filtersOpen ? " open" : "")}>
+          <div className="filters-inner">
       <section className="controls">
         <div className="ctrl ctrl-search">
           <label>Search</label>
@@ -294,10 +368,22 @@ export function App() {
           <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
         </div>
         <div className="ctrl-spacer" />
-        <DiceButton onClick={surprise} />
+        <span className="surprise-wrap surprise-desktop">
+          <DiceButton onClick={surprise} />
+        </span>
       </section>
+        </div>
+      </div>
+      </div>
 
-      <section className="cat-chips">
+      <section
+        ref={chipsRef}
+        className={
+          "cat-chips" +
+          (chipFade.left ? " fade-left" : "") +
+          (chipFade.right ? " fade-right" : "")
+        }
+      >
         {CATEGORIES.map((c) => (
           <button
             key={c.key}

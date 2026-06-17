@@ -23,6 +23,13 @@ body {
 }
 .app { max-width: 1240px; margin: 0 auto; padding: 34px 34px 80px; }
 
+/* compact/expandable filter bar — only shown on mobile; on desktop the wrappers
+   are transparent so the controls + chips lay out exactly as before */
+.filterbar, .filter-scrim { display: none; }
+.filtermenu, .filtertop, .filters-collapse, .filters-inner { display: contents; }
+.surprise-wrap { display: inline-flex; }
+.surprise-mobile { display: none; } /* desktop uses the one inside the controls */
+
 /* ---------- topbar ---------- */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .brand { display: flex; align-items: center; gap: 16px; }
@@ -62,7 +69,13 @@ body {
   border-radius: 20px; padding: 7px 15px; transition: all 0.15s ease;
 }
 .cat-chip:hover { border-color: var(--sage); color: var(--ink); }
-.cat-chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+/* selected = faint wash of the button's orange, so it reads as picked without
+   competing with the Surprise me button */
+.cat-chip.on {
+  background: rgba(227, 123, 51, 0.1); color: #b0631f;
+  border: 1px solid rgba(227, 123, 51, 0.42);
+}
+.cat-chip.on:hover { color: #b0631f; border-color: rgba(227, 123, 51, 0.6); }
 
 /* custom dropdown */
 .dd { position: relative; }
@@ -295,6 +308,106 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .appstate code { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 2px 7px; font-size: 13px; }
 
 @media (max-width: 900px) {
+  /* filter bar on top; the panel drops over the spot card as a glassy overlay */
+  .app { display: flex; flex-direction: column; padding: 18px 16px 60px; }
+  .topbar { order: 0; }
+  .filtermenu { display: block; order: 1; position: relative; z-index: 50; margin-bottom: 12px; }
+  .cat-chips { order: 2; }
+  .spotcard, .noresults { order: 3; }
+  .visited-section { order: 4; }
+
+  /* category filters: a compact scrollable row right above the card */
+  .cat-chips {
+    flex-wrap: nowrap; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .cat-chips::-webkit-scrollbar { display: none; }
+  .cat-chip { flex: none; }
+  /* fade the edge(s) that have more chips off-screen */
+  .cat-chips.fade-right {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+  }
+  .cat-chips.fade-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 26px);
+    mask-image: linear-gradient(to right, transparent, #000 26px);
+  }
+  .cat-chips.fade-left.fade-right {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  }
+
+  /* compact header: drop the long tagline, keep title + count tight */
+  .brand-text p { display: none; }
+  .brand-text h1 { font-size: 20px; }
+  .brand-mark { width: 38px; height: 38px; }
+
+  /* toggle bar + Surprise me sit in a row above the card */
+  .filtertop { display: flex; align-items: stretch; gap: 10px; position: relative; z-index: 2; }
+  .surprise-desktop { display: none; }
+  .surprise-mobile { display: flex; }
+  .surprise-mobile .surprise { height: 100%; }
+
+  /* the toggle bar */
+  .filterbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    position: relative; z-index: 2; flex: 1; min-width: 0; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 9px 14px; box-shadow: var(--shadow); color: var(--ink);
+    font-family: var(--serif-b); font-size: 13.5px;
+  }
+  .filterbar-label {
+    display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+    white-space: nowrap; color: var(--ink-soft);
+  }
+  .surprise-mobile .surprise { padding: 0 18px; }
+  .filterbar-badge {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+    padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 600; font-family: var(--serif-b);
+  }
+
+  /* tap-away scrim */
+  .filter-scrim {
+    display: block; position: fixed; inset: 0; z-index: 1;
+    background: rgba(20, 16, 12, 0.16);
+  }
+
+  /* the glassy dropdown panel overlaying the card */
+  .filters-collapse {
+    display: block; position: absolute; z-index: 2; top: calc(100% + 8px); left: 0; right: 0;
+    background: rgba(252, 250, 244, 0.96); backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(20, 16, 12, 0.22); padding: 16px 16px 4px;
+    opacity: 0; transform: translateY(-8px); pointer-events: none; visibility: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+  }
+  .filters-collapse.open {
+    opacity: 1; transform: none; pointer-events: auto; visibility: visible;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .filters-inner { display: block; }
+  .controls { margin-bottom: 0; background: transparent; border: none; box-shadow: none; padding: 0; }
+  /* 16px keeps iOS Safari from auto-zooming (and never zooming back) on focus */
+  .search-input, .note-input { font-size: 16px; }
+
+  /* fields match the glass panel: translucent bg, but text stays dark + legible */
+  .filters-collapse .search-input,
+  .filters-collapse .dd-trigger {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(120, 108, 92, 0.3);
+    color: var(--ink);
+  }
+  .filters-collapse .search-input::placeholder { color: var(--ink-soft); }
+  /* the option popups get their own blur since they float over the card */
+  .filters-collapse .dd-menu {
+    background: rgba(252, 250, 244, 0.97);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
   .spotcard { grid-template-columns: 1fr; touch-action: pan-y; will-change: transform; }
   .swipe-hint {
     display: inline-flex; align-items: center; gap: 7px; z-index: 2;
