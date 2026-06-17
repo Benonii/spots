@@ -3,7 +3,7 @@ import * as RSlider from "@radix-ui/react-slider";
 import type { Spot, VisitedEntry, VisitPatch } from "../lib/types";
 import { VISIT_DIMS } from "../lib/types";
 import { PRICE_LABELS } from "../lib/format";
-import { fireConfetti } from "../lib/confetti";
+import { fireConfetti, fireImplosion } from "../lib/confetti";
 import { EditableStars } from "./Stars";
 
 /** Muted red → orange → green by score (0..5), low saturation to match the UI. */
@@ -29,6 +29,7 @@ function Slider({
 
   const handle = (n: number) => {
     if (n === 5 && v !== 5 && thumbRef.current) fireConfetti(thumbRef.current);
+    if (n === 0 && v !== 0 && thumbRef.current) fireImplosion(thumbRef.current);
     onChange(n);
   };
 
