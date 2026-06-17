@@ -1,8 +1,30 @@
 import L from "leaflet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
+import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
+
+const SWIPED_KEY = "spots:swiped";
+
+function SwipeHintIcon() {
+  return (
+    <svg
+      width="26"
+      height="12"
+      viewBox="0 0 26 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 2 1 6l4 4" />
+      <path d="M21 2l4 4-4 4" />
+    </svg>
+  );
+}
 
 function TikTokIcon() {
   return (
@@ -170,18 +192,128 @@ export function SpotCard({
   const hasPrice = spot.price_level != null && spot.price_min != null;
   const basisLabel = spot.price_basis === "total" ? "total" : "per person";
 
+  // ----- mobile swipe (Tinder-style): drag horizontally to change spots -----
+  const [dx, setDx] = useState(0);
+  const [anim, setAnim] = useState(false);
+  const [hint, setHint] = useState(() => {
+    try {
+      return !localStorage.getItem(SWIPED_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const axis = useRef<"none" | "h" | "v">("none");
+  const dragged = useRef(false);
+  const SWIPE_MS = 200;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    // let the map handle its own touches; don't hijack panning
+    if ((e.target as HTMLElement).closest(".spot-right")) {
+      start.current = null;
+      return;
+    }
+    const t = e.touches[0]!;
+    start.current = { x: t.clientX, y: t.clientY };
+    axis.current = "none";
+    dragged.current = false;
+    setAnim(false);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!start.current) return;
+    const t = e.touches[0]!;
+    const mx = t.clientX - start.current.x;
+    const my = t.clientY - start.current.y;
+    if (axis.current === "none") {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      axis.current = Math.abs(mx) > Math.abs(my) ? "h" : "v"; // lock to vertical = page scroll
+    }
+    if (axis.current !== "h") return;
+    dragged.current = true;
+    setDx(mx);
+  };
+
+  const onTouchEnd = () => {
+    if (!start.current || axis.current !== "h") {
+      start.current = null;
+      return;
+    }
+    start.current = null;
+    const threshold = Math.min(110, window.innerWidth * 0.28);
+    const w = window.innerWidth;
+    if (Math.abs(dx) > threshold) {
+      const next = dx < 0; // swipe left → next, swipe right → previous
+      if (hint) {
+        setHint(false);
+        try {
+          localStorage.setItem(SWIPED_KEY, "1");
+        } catch {
+          /* ignore */
+        }
+      }
+      setAnim(true);
+      setDx(next ? -w : w); // fling out
+      window.setTimeout(() => {
+        if (next) onNext();
+        else onPrev();
+        setAnim(false);
+        setDx(next ? w : -w); // new card waits off the opposite edge
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            setAnim(true);
+            setDx(0); // ...and slides in
+          }),
+        );
+      }, SWIPE_MS);
+    } else {
+      setAnim(true);
+      setDx(0); // didn't pass the threshold → spring back
+    }
+  };
+
+  const swiping = anim || dx !== 0;
+  const cardStyle = swiping
+    ? {
+        transform: `translateX(${dx}px) rotate(${dx * 0.03}deg)`,
+        transition: anim ? `transform ${SWIPE_MS}ms ease` : "none",
+      }
+    : undefined;
+
   const coverChildren = (
     <>
       <span className="cover-area">{spot.neighborhood ?? "Addis Ababa"}</span>
       <span className="cover-count">
         {spot.video_count} TikTok {spot.video_count === 1 ? "review" : "reviews"}
       </span>
+      {hint && (
+        <span className="swipe-hint" aria-hidden="true">
+          <SwipeHintIcon /> Swipe to browse
+        </span>
+      )}
     </>
   );
   const coverStyle = { backgroundImage: coverImage(spot) };
 
   return (
-    <div className="spotcard">
+    <div
+      className="spotcard"
+      style={cardStyle}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTransitionEnd={() => {
+        if (dx === 0) setAnim(false);
+      }}
+      onClickCapture={(e) => {
+        // a swipe just happened — swallow the trailing click so links/buttons don't fire
+        if (dragged.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          dragged.current = false;
+        }
+      }}
+    >
       {spot.source_video_url ? (
         <a
           className="spot-cover"
@@ -190,6 +322,7 @@ export function SpotCard({
           target="_blank"
           rel="noreferrer"
           aria-label={`Watch ${spot.name} on TikTok`}
+          onClick={(e) => openTikTok(e, spot.source_video_url!)}
         >
           {coverChildren}
         </a>
@@ -219,6 +352,7 @@ export function SpotCard({
               href={spot.source_video_url}
               target="_blank"
               rel="noreferrer"
+              onClick={(e) => openTikTok(e, spot.source_video_url!)}
             >
               <TikTokIcon /> Watch
             </a>

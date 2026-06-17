@@ -12,6 +12,7 @@ import {
 } from "./lib/visits";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { Dropdown, type Option } from "./components/Dropdown";
+import { DiceButton } from "./components/DiceButton";
 import { SpotCard } from "./components/SpotCard";
 import { VisitedTable } from "./components/VisitedTable";
 
@@ -293,9 +294,7 @@ export function App() {
           <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
         </div>
         <div className="ctrl-spacer" />
-        <button className="surprise" onClick={surprise}>
-          <span className="dice">⚂</span> Surprise me
-        </button>
+        <DiceButton onClick={surprise} />
       </section>
 
       <section className="cat-chips">

@@ -105,7 +105,17 @@ body {
 }
 .surprise:hover { filter: brightness(1.05); transform: translateY(-1px); }
 .surprise:active { transform: translateY(0); }
-.surprise .dice { font-size: 18px; line-height: 1; }
+.surprise .dice-svg { display: block; transform-origin: 50% 50%; }
+.surprise .dice-svg.rolling { animation: dice-tumble 0.62s cubic-bezier(0.32, 0.86, 0.4, 1); }
+/* a thrown-die feel: a little hop, squash-and-stretch, and a couple of tumbles */
+@keyframes dice-tumble {
+  0%   { transform: translateY(0)    rotate(0deg)   scale(1, 1); }
+  18%  { transform: translateY(-7px) rotate(150deg) scale(0.86, 1.16); }
+  40%  { transform: translateY(0)    rotate(430deg) scale(1.14, 0.88); }
+  58%  { transform: translateY(-4px) rotate(560deg) scale(0.94, 1.08); }
+  78%  { transform: translateY(0)    rotate(680deg) scale(1.04, 0.96); }
+  100% { transform: translateY(0)    rotate(720deg) scale(1, 1); }
+}
 
 /* ---------- spot card ---------- */
 .spotcard {
@@ -126,6 +136,8 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .cover-area, .cover-count { position: absolute; z-index: 1; font-family: var(--serif-b); font-size: 11px; color: #fff; }
 .cover-area { top: 12px; left: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(20, 28, 20, 0.32); padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(2px); }
 .cover-count { bottom: 12px; left: 14px; opacity: 0.92; font-style: italic; }
+/* swipe affordance — mobile only (enabled in the max-width media query) */
+.swipe-hint { display: none; }
 
 .spot-headrow { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 .spot-name { font-family: var(--serif-d); font-weight: 500; font-size: 24.5px; line-height: 1.1; margin: 0; color: var(--ink); }
@@ -213,6 +225,8 @@ a.spot-cover:hover { filter: brightness(1.06); }
   display: grid; grid-template-columns: 1.7fr 0.9fr 0.6fr 1.1fr 0.9fr 2.4fr 32px;
   align-items: center; gap: 14px; padding: 13px 18px;
 }
+/* on desktop the meta fields sit directly in the 7-col grid; on mobile they group */
+.vt-meta { display: contents; }
 .vt-head { background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .vt-head span { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .vt-entry { border-bottom: 1px solid var(--line-soft); }
@@ -232,20 +246,21 @@ a.spot-cover:hover { filter: brightness(1.06); }
   font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; width: 56px; flex: none;
 }
-.vt-slider-input {
-  flex: 1; min-width: 0; cursor: pointer; height: 3px; border-radius: 3px;
-  -webkit-appearance: none; appearance: none; background: var(--line-soft);
+.rs-root {
+  position: relative; display: flex; align-items: center; flex: 1; min-width: 0;
+  height: 12px; touch-action: none; user-select: none; cursor: pointer;
 }
-.vt-slider-input::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none; width: 11px; height: 11px;
-  border-radius: 50%; background: var(--thumb, var(--primary));
-  border: 2px solid var(--surface); margin-top: 0; transition: background 0.15s ease;
+.rs-track {
+  position: relative; flex-grow: 1; height: 3px; border-radius: 999px;
+  background: var(--line-soft); overflow: hidden;
 }
-.vt-slider-input::-moz-range-track { background: transparent; height: 3px; border-radius: 3px; }
-.vt-slider-input::-moz-range-thumb {
-  width: 11px; height: 11px; border-radius: 50%; background: var(--thumb, var(--primary));
-  border: 2px solid var(--surface);
+.rs-range { position: absolute; height: 100%; border-radius: 999px; background: #c2bbac; }
+.rs-thumb {
+  display: block; width: 9px; height: 9px; border-radius: 50%; background: #b3aa98;
+  outline: none; border: none; transition: transform 0.12s ease;
 }
+.rs-thumb:hover { transform: scale(1.25); }
+.rs-thumb:focus-visible { box-shadow: 0 0 0 3px rgba(62, 92, 68, 0.18); }
 .vt-slider-val {
   font-size: 11.5px; color: var(--ink-soft); width: 20px; text-align: right;
   font-variant-numeric: tabular-nums; flex: none;
@@ -280,13 +295,54 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .appstate code { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 2px 7px; font-size: 13px; }
 
 @media (max-width: 900px) {
-  .spotcard { grid-template-columns: 1fr; }
+  .spotcard { grid-template-columns: 1fr; touch-action: pan-y; will-change: transform; }
+  .swipe-hint {
+    display: inline-flex; align-items: center; gap: 7px; z-index: 2;
+    position: absolute; right: 14px; bottom: 12px;
+    background: rgba(20, 28, 20, 0.5); color: #fff; backdrop-filter: blur(2px);
+    font-family: var(--serif-b); font-size: 11.5px; font-style: italic;
+    padding: 6px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+    animation: swipe-hint-nudge 2.4s ease-in-out infinite;
+  }
+  @keyframes swipe-hint-nudge {
+    0%, 100% { transform: translateX(4px); opacity: 0.82; }
+    50%      { transform: translateX(-4px); opacity: 1; }
+  }
   .spot-cover { height: 300px; background-position: center 18%; border-right: none; border-bottom: 1px solid var(--line); order: 0; }
   .spot-left { order: 1; }
   .spot-right { min-height: 300px; border-left: none; border-top: 1px solid var(--line); order: 2; }
+  /* header stacks so the title doesn't get squeezed by the count */
+  .topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .brand-count { align-self: flex-start; }
+
+  /* anchor "Surprise me" to the right of the controls */
+  .ctrl-spacer { display: none; }
+  .surprise { margin-left: auto; }
+
+  /* keep the section title on one line */
+  .vs-head { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .vs-head h3 { white-space: nowrap; }
+
+  /* visited entries become stacked cards instead of a wide table */
   .vt-head { display: none; }
-  .vt-row { grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 14px 16px; }
-  .vt-c-notes { grid-column: 1 / -1; }
-  .vt-c-x { position: absolute; }
-  .vt-sliders { grid-template-columns: repeat(2, 1fr); padding: 0 16px 14px; }
+  .vt-entry { position: relative; }
+  .vt-row {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 9px; padding: 15px 16px 11px;
+  }
+  .vt-place { font-size: 15px; padding-right: 26px; }
+  .vt-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px;
+  }
+  .vt-remove { position: absolute; top: 11px; right: 9px; }
+
+  /* one slider per row, label sitting above its track */
+  .vt-sliders { grid-template-columns: 1fr; gap: 13px; padding: 4px 16px 15px; }
+  .vt-slider {
+    display: grid; grid-template-columns: 1fr auto; align-items: center;
+    grid-template-areas: "label label" "slider val"; gap: 5px 10px;
+  }
+  .vt-slider-label { grid-area: label; width: auto; }
+  .rs-root { grid-area: slider; }
+  .vt-slider-val { grid-area: val; }
 }

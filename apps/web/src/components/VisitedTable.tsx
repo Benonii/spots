@@ -1,4 +1,5 @@
-import { useRef, type CSSProperties } from "react";
+import { useRef } from "react";
+import * as RSlider from "@radix-ui/react-slider";
 import type { Spot, VisitedEntry, VisitPatch } from "../lib/types";
 import { VISIT_DIMS } from "../lib/types";
 import { PRICE_LABELS } from "../lib/format";
@@ -22,35 +23,35 @@ function Slider({
   value: number | null;
   onChange: (v: number) => void;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const thumbRef = useRef<HTMLSpanElement>(null);
   const rated = value != null;
   const v = value ?? 0;
-  const pct = (v / 5) * 100;
-  const color = rated ? dimColor(v) : "var(--line)";
-  const track = `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, var(--line-soft) ${pct}%, var(--line-soft) 100%)`;
 
   const handle = (n: number) => {
-    if (n === 5 && v !== 5 && ref.current) fireConfetti(ref.current);
+    if (n === 5 && v !== 5 && thumbRef.current) fireConfetti(thumbRef.current);
     onChange(n);
   };
 
   return (
     <label className="vt-slider">
       <span className="vt-slider-label">{label}</span>
-      <input
-        ref={ref}
-        className="vt-slider-input"
-        type="range"
+      <RSlider.Root
+        className="rs-root"
         min={0}
         max={5}
         step={0.5}
-        value={v}
-        style={{ background: track, "--thumb": color } as CSSProperties}
-        onChange={(e) => handle(Number(e.target.value))}
-      />
+        value={[v]}
+        onValueChange={([n]) => handle(n!)}
+        aria-label={label}
+      >
+        <RSlider.Track className="rs-track">
+          <RSlider.Range className="rs-range" />
+        </RSlider.Track>
+        <RSlider.Thumb ref={thumbRef} className="rs-thumb" />
+      </RSlider.Root>
       <span
         className={"vt-slider-val" + (rated ? "" : " empty")}
-        style={rated ? { color } : undefined}
+        style={rated ? { color: dimColor(v) } : undefined}
       >
         {rated ? v.toFixed(1) : "–"}
       </span>
@@ -93,24 +94,32 @@ export function VisitedTable({
           <div className="vt-entry" key={v.id}>
             <div className="vt-row">
               <span className="vt-c-place vt-place">{v.name}</span>
-              <span className="vt-c-area">{s?.neighborhood ?? "—"}</span>
-              <span className="vt-c-price">
-                {s && s.price_level != null ? PRICE_LABELS[s.price_level] : "—"}
-              </span>
-              <span className="vt-c-rate">
-                <EditableStars
-                  value={v.rating || 0}
-                  onChange={(r) => onUpdate(v.id, { rating: r })}
-                />
-              </span>
-              <span className="vt-c-date">{v.visitedAt}</span>
+              <div className="vt-meta">
+                <span className="vt-c-area">{s?.neighborhood ?? "—"}</span>
+                <span className="vt-c-price">
+                  {s && s.price_level != null ? PRICE_LABELS[s.price_level] : "—"}
+                </span>
+                <span className="vt-c-rate">
+                  <EditableStars
+                    value={v.rating || 0}
+                    onChange={(r) => onUpdate(v.id, { rating: r })}
+                  />
+                </span>
+                <span className="vt-c-date">{v.visitedAt}</span>
+              </div>
               <span className="vt-c-notes">
                 <textarea
                   className="note-input"
                   value={v.notes || ""}
-                  placeholder="Add a note…"
+                  placeholder="Add a note… (Enter to save, Shift+Enter for a new line)"
                   rows={2}
                   onChange={(e) => onUpdate(v.id, { notes: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.blur(); // commit (write-through already debounced)
+                    }
+                  }}
                 />
               </span>
               <button
