@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import type { Spot, VisitedEntry, VisitPatch } from "./lib/types";
-import { fetchSpots } from "./lib/supabase";
+import { ensureSession, fetchSpots } from "./lib/supabase";
 import {
   createVisit,
   deleteVisit,
@@ -87,9 +87,12 @@ export function App() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  // load our visit log from the DB (importing any legacy localStorage log once)
+  // load our visit log from the DB (importing any legacy localStorage log once).
+  // ensureSession() signs the visitor in anonymously first so RLS returns *their*
+  // rows and subsequent writes are stamped with their id.
   useEffect(() => {
-    fetchVisits()
+    ensureSession()
+      .then(fetchVisits)
       .then(async (rows) => {
         const migrated = await migrateLegacyVisits(rows);
         setVisited(migrated.length ? [...migrated, ...rows] : rows);

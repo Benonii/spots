@@ -12,6 +12,27 @@ if (!url || !key) {
 
 export const supabase = createClient(url, key);
 
+/**
+ * Ensure there's a session before any owner-scoped query (the "Places we've
+ * been" log). Uses Supabase Anonymous Auth: the first visit silently mints a
+ * durable anonymous user (no login UI) so each device gets its own private log
+ * under RLS; supabase-js persists + auto-refreshes the session in localStorage.
+ * Idempotent — getSession() is a local read, so calling this repeatedly is cheap.
+ */
+let sessionReady: Promise<void> | null = null;
+export function ensureSession(): Promise<void> {
+  return (sessionReady ??= (async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) {
+        sessionReady = null; // allow a retry on the next call
+        throw new Error(error.message);
+      }
+    }
+  })());
+}
+
 const EMPTY_SIGNALS: QualitySignals = {
   dimensions: { aesthetic: 0, vibe: 0, food: 0, value: 0, service: 0 },
   evidence: { positiveMentions: 0, negativeMentions: 0, aestheticMentions: 0 },

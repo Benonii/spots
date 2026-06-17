@@ -32,7 +32,7 @@ import {
   check,
   pgPolicy,
 } from "drizzle-orm/pg-core";
-import { anonRole } from "drizzle-orm/supabase";
+import { anonRole, authenticatedRole } from "drizzle-orm/supabase";
 
 /* ------------------------------------------------------------------ */
 /* jsonb sub-types                                                     */
@@ -162,9 +162,11 @@ export const spots = pgTable(
     ),
     check("spots_price_level_check", sql`${t.priceLevel} between 1 and 4`),
     // App-facing read access. Defining a policy auto-enables RLS on this table.
+    // Both roles: anonymous-auth visitors carry the `authenticated` role, and a
+    // first-time visitor reads spots before the anonymous sign-in completes.
     pgPolicy("public read spots", {
       for: "select",
-      to: anonRole,
+      to: [anonRole, authenticatedRole],
       using: sql`true`,
     }),
   ],
@@ -187,17 +189,24 @@ export const spots = pgTable(
  * subjective scores; null until rated. In the future these feed back into a
  * spot's overall rating + per-dimension scores alongside the data-derived ones.
  *
- * SECURITY: anon insert/update/delete is open for now because there is no auth
- * yet and the app isn't shared. When auth lands, scope these policies to
- * `auth.uid() = user_id` (and an "owner edits the null rows" grant). Until then,
- * do not treat this table as trusted input.
+ * SECURITY: scoped to the signed-in user via Supabase Anonymous Auth. Every
+ * visitor is silently signed in (no login UI) and gets the `authenticated` role
+ * with a stable `auth.uid()`; `user_id` defaults to that id on insert, and all
+ * four policies require `auth.uid() = user_id`, so a person can only see and
+ * edit their own log. `user_id` stays nullable so the pre-auth rows survive the
+ * migration — those legacy rows (null owner) are simply invisible until
+ * backfilled to a real id. An anonymous user can later link an email to make
+ * the same history durable across devices.
  */
 export const visits = pgTable(
   "visits",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     googlePlaceId: text("google_place_id").notNull(), // -> spots.google_place_id
-    userId: text("user_id"), // null = ours, for now (see note above)
+    // owner of the row; stamped from the caller's JWT on insert. Nullable only
+    // so pre-auth rows survive the migration (see note above). A column DEFAULT
+    // can't be a subquery, so this is the bare function call (not `select`).
+    userId: text("user_id").default(sql`(auth.uid())::text`),
     name: text("name").notNull(), // denormalized spot name for display
     visitedAt: text("visited_at").notNull(), // ISO date 'YYYY-MM-DD'
     rating: numeric("rating"), // overall 0..5 (stars); null = unrated
@@ -220,26 +229,31 @@ export const visits = pgTable(
   (t) => [
     index("visits_place_idx").on(t.googlePlaceId),
     index("visits_user_idx").on(t.userId),
+    // Owner-scoped: a signed-in user only ever touches their own rows.
+    // `(select auth.uid())` is wrapped so Postgres caches it per-statement.
+    // NB: the policy *names* are inherited from the pre-auth migration (hence
+    // the now-inaccurate "anon" prefix) so drizzle-kit sees in-place changes
+    // rather than renames — the latter need an interactive prompt to resolve.
     pgPolicy("public read visits", {
       for: "select",
-      to: anonRole,
-      using: sql`true`,
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
     }),
     pgPolicy("anon insert visits", {
       for: "insert",
-      to: anonRole,
-      withCheck: sql`true`,
+      to: authenticatedRole,
+      withCheck: sql`(select auth.uid())::text = ${t.userId}`,
     }),
     pgPolicy("anon update visits", {
       for: "update",
-      to: anonRole,
-      using: sql`true`,
-      withCheck: sql`true`,
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
+      withCheck: sql`(select auth.uid())::text = ${t.userId}`,
     }),
     pgPolicy("anon delete visits", {
       for: "delete",
-      to: anonRole,
-      using: sql`true`,
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
     }),
   ],
 );
