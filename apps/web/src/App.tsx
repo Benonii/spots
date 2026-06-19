@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
-import type { Spot, VisitedEntry, VisitPatch } from "./lib/types";
-import { ensureSession, fetchSpots } from "./lib/supabase";
+import type { User } from "@supabase/supabase-js";
+import type { CommunityVisit, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import { fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
 import {
   createVisit,
   deleteVisit,
   deleteVisitsByPlace,
+  fetchCommunityVisits,
   fetchVisits,
   migrateLegacyVisits,
   updateVisit,
 } from "./lib/visits";
+import { upsertProfile } from "./lib/profiles";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { Dropdown, type Option } from "./components/Dropdown";
 import { DiceButton } from "./components/DiceButton";
 import { SpotCard } from "./components/SpotCard";
 import { VisitedTable } from "./components/VisitedTable";
+import { CommunityTable } from "./components/CommunityTable";
+import { AuthButton } from "./components/AuthButton";
+import { BrandMark } from "./components/BrandMark";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -75,7 +81,9 @@ export function App() {
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
   const [visited, setVisited] = useState<VisitedEntry[]>([]);
+  const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const reportWriteError = useCallback((e: unknown) => {
     setWriteError(e instanceof Error ? e.message : String(e));
@@ -87,18 +95,36 @@ export function App() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  // load our visit log from the DB (importing any legacy localStorage log once).
-  // ensureSession() signs the visitor in anonymously first so RLS returns *their*
-  // rows and subsequent writes are stamped with their id.
+  // track the Google session (and the OAuth redirect back into the app)
   useEffect(() => {
-    ensureSession()
-      .then(fetchVisits)
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // load the signed-in user's own log (importing any legacy localStorage log
+  // once) plus everyone's public reviews; mirror their Google profile so their
+  // reviews show a name + avatar. All cleared when signed out.
+  useEffect(() => {
+    if (!user) {
+      setVisited([]);
+      setCommunity([]);
+      return;
+    }
+    void upsertProfile(user).catch(() => {}); // best-effort; don't block the log
+    fetchVisits(user.id)
       .then(async (rows) => {
         const migrated = await migrateLegacyVisits(rows);
         setVisited(migrated.length ? [...migrated, ...rows] : rows);
       })
       .catch(reportWriteError);
-  }, [reportWriteError]);
+    // community feed is non-critical — never let it block or error the log
+    fetchCommunityVisits()
+      .then(setCommunity)
+      .catch((e) => console.warn("community feed unavailable:", e));
+  }, [user, reportWriteError]);
 
   // show a *random* spot on every page load (not just the first), once spots arrive
   const pickedRandom = useRef(false);
@@ -177,6 +203,10 @@ export function App() {
     : false;
 
   const toggleVisited = useCallback(() => {
+    if (!user) {
+      void signInWithGoogle().catch(reportWriteError); // prompt sign-in, then they can mark it
+      return;
+    }
     if (!current) return;
     const placeId = current.google_place_id;
     if (visited.some((v) => v.placeId === placeId)) {
@@ -191,7 +221,7 @@ export function App() {
         .then((entry) => setVisited((prev) => [entry, ...prev]))
         .catch(reportWriteError);
     }
-  }, [current, visited, reportWriteError]);
+  }, [user, current, visited, reportWriteError]);
 
   // Coalesce rapid edits (slider drags, note typing) into one DB write per row.
   const pendingPatch = useRef<Map<string, VisitPatch>>(new Map());
@@ -231,6 +261,14 @@ export function App() {
       return next;
     });
   }, []);
+
+  const handleSignIn = useCallback(() => {
+    void signInWithGoogle().catch(reportWriteError);
+  }, [reportWriteError]);
+
+  const handleSignOut = useCallback(() => {
+    void signOut().catch(reportWriteError);
+  }, [reportWriteError]);
 
   const clearFilters = useCallback(() => {
     setArea("All areas");
@@ -288,8 +326,38 @@ export function App() {
   }
   if (!spots) {
     return (
-      <div className="appstate">
-        <p>Loading spots…</p>
+      <div className="app">
+        <header className="topbar">
+          <div className="brand">
+            <BrandMark className="brand-mark" />
+            <div className="brand-text">
+              <h1>Where to next</h1>
+              <p>Date spots around Addis · sourced from the people who actually went</p>
+            </div>
+          </div>
+        </header>
+        <div className="sk-card" aria-busy="true" aria-label="Loading spots…">
+          <div className="sk sk-cover" />
+          <div className="sk-body">
+            <div className="sk sk-title" />
+            <div className="sk sk-loc" />
+            <div className="sk-row">
+              <span className="sk sk-pill" />
+              <span className="sk sk-pill" />
+            </div>
+            <div className="sk-lines">
+              <div className="sk sk-line" />
+              <div className="sk sk-line" />
+              <div className="sk sk-line sk-short" />
+            </div>
+            <div className="sk-row sk-tags">
+              <span className="sk sk-tag" />
+              <span className="sk sk-tag" />
+              <span className="sk sk-tag" />
+            </div>
+          </div>
+          <div className="sk sk-map" />
+        </div>
       </div>
     );
   }
@@ -308,14 +376,17 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark" />
+          <BrandMark className="brand-mark" />
           <div className="brand-text">
             <h1>Where to next</h1>
             <p>Date spots around Addis · sourced from the people who actually went</p>
           </div>
         </div>
-        <div className="brand-count">
-          {spots.length} places · {visited.length} visited
+        <div className="topbar-right">
+          <div className="brand-count">
+            {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+          </div>
+          <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>
 
@@ -345,8 +416,9 @@ export function App() {
           <div className="filters-inner">
       <section className="controls">
         <div className="ctrl ctrl-search">
-          <label>Search</label>
+          <label htmlFor="spot-search">Search</label>
           <input
+            id="spot-search"
             className="search-input"
             type="text"
             placeholder="rooftop coffee, quiet date…"
@@ -360,15 +432,16 @@ export function App() {
             value={area}
             onChange={setArea}
             options={neighborhoods.map((n) => ({ value: n, label: n }))}
+            ariaLabel="Area"
           />
         </div>
         <div className="ctrl">
           <label>Price</label>
-          <Dropdown value={price} onChange={setPrice} options={PRICE_OPTIONS} />
+          <Dropdown value={price} onChange={setPrice} options={PRICE_OPTIONS} ariaLabel="Price" />
         </div>
         <div className="ctrl">
           <label>Sort by</label>
-          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
+          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} ariaLabel="Sort by" />
         </div>
         <div className="ctrl-spacer" />
         <span className="surprise-wrap surprise-desktop">
@@ -421,18 +494,45 @@ export function App() {
           <span className="vs-sub">
             {writeError ? (
               <span className="vs-error">Couldn't sync: {writeError}</span>
+            ) : user ? (
+              <>{visited.length} logged · saved to your account</>
             ) : (
-              <>{visited.length} logged · saved to the cloud</>
+              <>sign in to start your log</>
             )}
           </span>
         </div>
+        {!user ? (
+          <div className="visited-empty">
+            <p style={{ margin: "0 0 14px" }}>
+              Sign in to track the places you've been and save spots you want to go.
+            </p>
+            <button className="auth-btn" onClick={handleSignIn}>
+              Sign in with Google
+            </button>
+          </div>
+        ) : (
         <VisitedTable
           visited={visited}
           spotsById={spotsById}
           onUpdate={updateVisited}
           onRemove={removeVisited}
         />
+        )}
       </section>
+
+      {user && (
+        <section className="community-section">
+          <div className="vs-head">
+            <h3>Community reviews</h3>
+            <span className="vs-sub">
+              {community.length
+                ? `${community.length} review${community.length === 1 ? "" : "s"} from the community`
+                : "be the first to leave a review"}
+            </span>
+          </div>
+          <CommunityTable entries={community} spotsById={spotsById} />
+        </section>
+      )}
     </div>
   );
 }
