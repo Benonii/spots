@@ -230,6 +230,10 @@ export const visits = pgTable(
   (t) => [
     index("visits_place_idx").on(t.googlePlaceId),
     index("visits_user_idx").on(t.userId),
+    // notes are public reviews — cap their length so a single row can't carry a
+    // giant payload. NULL passes (unrated/no-note rows). Mirrored client-side by
+    // the textarea maxLength in VisitedTable.
+    check("visits_notes_len_check", sql`char_length(${t.notes}) <= 1000`),
     // Reads are PUBLIC: every signed-in user sees everyone's visits (the notes
     // are public reviews, surfaced in the community "everyone's been" table).
     // Writes stay owner-scoped — you can only insert/edit/delete your own rows.

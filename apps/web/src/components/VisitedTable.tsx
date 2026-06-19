@@ -114,6 +114,7 @@ export function VisitedTable({
                   value={v.notes || ""}
                   placeholder="Write a public review… (everyone can see this)"
                   rows={2}
+                  maxLength={1000}
                   onChange={(e) => onUpdate(v.id, { notes: e.target.value })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {

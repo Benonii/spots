@@ -1,0 +1,1 @@
+ALTER TABLE "visits" ADD CONSTRAINT "visits_notes_len_check" CHECK (char_length("visits"."notes") <= 1000);
