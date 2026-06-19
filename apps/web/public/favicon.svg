@@ -9,20 +9,10 @@
       <stop offset="100%" stop-color="#ef9a3d"/>
     </radialGradient>
     <clipPath id="head"><circle cx="24" cy="19" r="12.6"/></clipPath>
-    <style>
-      /* pin chrome is the brand dark on light tab bars, white on dark ones
-         (where the dark green would otherwise vanish) */
-      .pin { fill: #2c4232; }
-      .ring { stroke: #2c4232; }
-      @media (prefers-color-scheme: dark) {
-        .pin { fill: #fdf8ef; }
-        .ring { stroke: #fdf8ef; }
-      }
-    </style>
   </defs>
-  <!-- pin body -->
-  <path class="pin" d="M24 3.4 C15 3.4 7.4 10.5 7.4 19.2 C7.4 28.6 17.6 38.6 22.7 44.4 a1.75 1.75 0 0 0 2.6 0 C30.4 38.6 40.6 28.6 40.6 19.2 C40.6 10.5 33 3.4 24 3.4 Z"/>
-  <!-- golden-hour scene inside the pin head -->
+  <!-- pin body — white so it reads on dark tab strips / sidebars -->
+  <path fill="#ffffff" d="M24 3.4 C15 3.4 7.4 10.5 7.4 19.2 C7.4 28.6 17.6 38.6 22.7 44.4 a1.75 1.75 0 0 0 2.6 0 C30.4 38.6 40.6 28.6 40.6 19.2 C40.6 10.5 33 3.4 24 3.4 Z"/>
+  <!-- golden-hour scene inside the pin head (keeps it recognizable on light bg too) -->
   <g clip-path="url(#head)">
     <rect x="11" y="6" width="26" height="27" fill="url(#sky)"/>
     <circle cx="24" cy="21.5" r="6.6" fill="url(#sun)"/>
@@ -30,5 +20,5 @@
     <path d="M11 27.5 q 7 -3 13 0.8 q 6 3 13 -1 v 9 h -26 Z" fill="#3e5c44"/>
   </g>
   <!-- frame ring -->
-  <circle class="ring" cx="24" cy="19" r="12.6" fill="none" stroke-width="2.2"/>
+  <circle cx="24" cy="19" r="12.6" fill="none" stroke="#ffffff" stroke-width="2.2"/>
 </svg>
