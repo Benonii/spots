@@ -50,6 +50,13 @@
       "when": 1781898655696,
       "tag": "0006_wet_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781901085922,
+      "tag": "0007_hot_ulik",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ import {
   integer,
   jsonb,
   index,
+  uniqueIndex,
   check,
   pgPolicy,
 } from "drizzle-orm/pg-core";
@@ -300,6 +301,46 @@ export const profiles = pgTable(
       to: authenticatedRole,
       using: sql`(select auth.uid())::text = ${t.id}`,
       withCheck: sql`(select auth.uid())::text = ${t.id}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* saved_spots — a user's private "want to go" bookmarks                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One row per (user, spot) the user wants to visit later. PRIVATE — unlike
+ * visits, only the owner can read their own list. `user_id` is stamped from the
+ * caller's JWT on insert; a (user_id, google_place_id) unique constraint keeps
+ * saves idempotent so a double-tap can't create duplicates.
+ */
+export const savedSpots = pgTable(
+  "saved_spots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").default(sql`(auth.uid())::text`),
+    googlePlaceId: text("google_place_id").notNull(), // -> spots.google_place_id
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("saved_user_place_idx").on(t.userId, t.googlePlaceId),
+    pgPolicy("read own saved", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+    pgPolicy("insert own saved", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+    pgPolicy("delete own saved", {
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
     }),
   ],
 );

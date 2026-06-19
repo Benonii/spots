@@ -4,7 +4,7 @@
   --surface: transparent; --surface-2: transparent;
   /* --muted darkened to clear WCAG AA 4.5:1 on the warm bg (was #8a8170 ≈ 3.85:1) */
   --ink: #2b3a2e; --ink-soft: #586256; --muted: #6f6857;
-  --line: #e2d7c2; --line-soft: #ece3d1;
+  --line: #e2d7c2; --line-soft: #ece3d1; --divider: #d6d2c8;
   --green: #3e5c44; --green-deep: #2c4232; --sage: #7e9579;
   --terracotta: #e37b33; --amber: #e6a94f; --gold: #efc877;
   --accent: #e37b33; --primary: #3e5c44; --hero-a: #3e5c44; --hero-b: #e37b33;
@@ -64,6 +64,8 @@ body {
 .brand-text h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; letter-spacing: 0.2px; color: var(--ink); }
 .brand-text p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); font-style: italic; }
 .brand-count { font-size: 0.7812rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+/* desktop: count sits top-right by the auth button; mobile: under the title */
+.brand-count-mobile { display: none; margin-top: 7px; }
 
 /* auth control */
 .topbar-right { display: flex; align-items: center; gap: 16px; flex: none; }
@@ -352,7 +354,11 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .visited-empty { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 34px; text-align: center; color: var(--muted); font-style: italic; font-size: 0.9062rem; }
 
 /* ---------- community table (everyone's log — same table, read-only + Who) ---------- */
-.community-section { margin-top: 42px; }
+.community-section { margin-top: 30px; }
+/* light dashed divider between the stacked sections */
+.saved-section, .visited-section, .community-section {
+  border-top: 1px dashed var(--divider); margin-top: 30px; padding-top: 30px;
+}
 /* same columns as the personal table, but no ×, and a Who (avatar) column
    sitting just before the review */
 .visited-table.is-community .vt-head,
@@ -369,6 +375,44 @@ a.spot-cover:hover { filter: brightness(1.06); }
 /* read-only score track — looks like the slider, no thumb / interaction */
 .rs-ro { cursor: default; }
 .rs-ro .rs-range { background: #c2bbac; }
+
+/* ---------- save button + "Want to go" list ---------- */
+.save-btn.on,
+.save-btn.on:hover {
+  color: var(--accent-text); background: var(--accent-wash); border-color: var(--accent-line);
+}
+.saved-section { margin-top: 30px; }
+.saved-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.saved-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.saved-item:hover { border-color: var(--sage); transform: translateY(-1px); }
+.saved-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.saved-name {
+  font-family: var(--serif-d); font-weight: 600; color: var(--ink); font-size: 0.9375rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.saved-meta { font-size: 0.75rem; color: var(--muted); }
+.saved-remove {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1px solid transparent;
+  background: transparent; color: var(--muted); font-size: 1.125rem; line-height: 1; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.saved-remove:hover { background: rgba(197, 107, 58, 0.12); color: var(--accent-text); border-color: rgba(197, 107, 58, 0.3); }
+/* collapsible header toggle */
+.saved-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; color: inherit;
+}
+.saved-toggle svg { color: var(--muted); transition: transform 0.2s ease; }
+/* grid-rows collapse — animates height without a fixed max-height */
+.saved-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s ease; }
+.saved-collapse.open { grid-template-rows: 1fr; }
+.saved-collapse > .saved-list { min-height: 0; overflow: hidden; }
 
 .noresults { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 48px; text-align: center; color: var(--ink-soft); font-size: 1rem; margin-bottom: 38px; }
 .noresults button { font-family: var(--serif-b); color: var(--accent-text); background: none; border: none; text-decoration: underline; cursor: pointer; font-size: 1rem; }
@@ -416,8 +460,9 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .filtermenu { display: block; order: 1; position: relative; z-index: 50; margin-bottom: 12px; }
   .cat-chips { order: 2; }
   .spotcard, .noresults { order: 3; }
-  .visited-section { order: 4; }
-  .community-section { order: 5; }
+  .saved-section { order: 4; }
+  .visited-section { order: 5; }
+  .community-section { order: 6; }
 
   /* category filters: a compact scrollable row right above the card */
   .cat-chips {
@@ -532,11 +577,12 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .spot-cover { height: clamp(360px, 52vh, 520px); background-position: center 22%; border-right: none; border-bottom: 1px solid var(--line); order: 0; }
   .spot-left { order: 1; }
   .spot-right { min-height: 300px; border-left: none; border-top: 1px solid var(--line); order: 2; }
-  /* brand on the left, auth control on the top-right next to the title; the
-     count tucks beneath it (so it never squeezes the sign-in button) */
+  /* brand (+ its count) on the left, auth control alone on the top-right */
   .topbar { align-items: flex-start; gap: 12px; }
-  .topbar-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
+  .topbar-right { align-items: flex-start; }
   .auth-name { display: none; } /* avatar alone keeps the signed-in chip compact */
+  .brand-count-desktop { display: none; }
+  .brand-count-mobile { display: block; }
 
   /* anchor "Surprise me" to the right of the controls */
   .ctrl-spacer { display: none; }

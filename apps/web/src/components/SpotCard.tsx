@@ -53,6 +53,24 @@ function MapPinIcon() {
   );
 }
 
+function BookmarkIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="13"
+      height="13"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1z" />
+    </svg>
+  );
+}
+
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
     <svg
@@ -186,6 +204,8 @@ export function SpotCard({
   onNext,
   isVisited,
   onToggleVisited,
+  isSaved,
+  onToggleSaved,
   showBreakdown = true,
 }: {
   spot: Spot;
@@ -195,6 +215,8 @@ export function SpotCard({
   onNext: () => void;
   isVisited: boolean;
   onToggleVisited: () => void;
+  isSaved: boolean;
+  onToggleSaved: () => void;
   showBreakdown?: boolean;
 }) {
   const stars = spot.quality_score / 20;
@@ -250,7 +272,7 @@ export function SpotCard({
       return;
     }
     start.current = null;
-    const threshold = Math.min(110, window.innerWidth * 0.28);
+    const threshold = Math.min(56, window.innerWidth * 0.14);
     const w = window.innerWidth;
     if (Math.abs(dx) > threshold) {
       const next = dx < 0; // swipe left → next, swipe right → previous
@@ -370,6 +392,13 @@ export function SpotCard({
           <a className="action-btn" href={mapsUrl(spot)} target="_blank" rel="noreferrer">
             <MapPinIcon /> Map
           </a>
+          <button
+            className={"action-btn save-btn" + (isSaved ? " on" : "")}
+            onClick={onToggleSaved}
+            aria-pressed={isSaved}
+          >
+            <BookmarkIcon filled={isSaved} /> {isSaved ? "Saved" : "Save"}
+          </button>
         </div>
 
         {spot.summary && <p className="spot-summary">{spot.summary}</p>}

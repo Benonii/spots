@@ -13,7 +13,9 @@ import {
   updateVisit,
 } from "./lib/visits";
 import { upsertProfile } from "./lib/profiles";
+import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
+import { PRICE_LABELS } from "./lib/format";
 import { Dropdown, type Option } from "./components/Dropdown";
 import { DiceButton } from "./components/DiceButton";
 import { SpotCard } from "./components/SpotCard";
@@ -81,6 +83,15 @@ export function App() {
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
   const [visited, setVisited] = useState<VisitedEntry[]>([]);
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [savedOpen, setSavedOpen] = useState(() => {
+    try {
+      return localStorage.getItem("spots:wishOpen") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -110,6 +121,7 @@ export function App() {
   useEffect(() => {
     if (!user) {
       setVisited([]);
+      setSaved(new Set());
       setCommunity([]);
       return;
     }
@@ -120,6 +132,7 @@ export function App() {
         setVisited(migrated.length ? [...migrated, ...rows] : rows);
       })
       .catch(reportWriteError);
+    fetchSaved(user.id).then((ids) => setSaved(new Set(ids))).catch(reportWriteError);
     // community feed is non-critical — never let it block or error the log
     fetchCommunityVisits()
       .then(setCommunity)
@@ -174,6 +187,17 @@ export function App() {
     setIndex(0);
   }, [area, price, sort, query, categories]);
 
+  // land on a "want to go" target once it appears in the filtered list
+  useEffect(() => {
+    if (!pendingTarget) return;
+    const idx = filtered.findIndex((s) => s.google_place_id === pendingTarget);
+    if (idx >= 0) {
+      setIndex(idx);
+      setPendingTarget(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [pendingTarget, filtered]);
+
   const total = filtered.length;
   const current: Spot | null = total
     ? filtered[Math.min(index, total - 1)] ?? null
@@ -201,6 +225,48 @@ export function App() {
   const isVisited = current
     ? visited.some((v) => v.placeId === current.google_place_id)
     : false;
+  const isSaved = current ? saved.has(current.google_place_id) : false;
+
+  const toggleSaved = useCallback(() => {
+    if (!user) {
+      void signInWithGoogle().catch(reportWriteError);
+      return;
+    }
+    if (!current) return;
+    const placeId = current.google_place_id;
+    const has = saved.has(placeId);
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (has) next.delete(placeId);
+      else next.add(placeId);
+      return next;
+    });
+    (has ? removeSaved(placeId) : addSaved(placeId)).catch(reportWriteError);
+  }, [user, current, saved, reportWriteError]);
+
+  const toggleSavedOpen = useCallback(() => {
+    setSavedOpen((o) => {
+      const next = !o;
+      try {
+        localStorage.setItem("spots:wishOpen", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const removeSavedSpot = useCallback(
+    (placeId: string) => {
+      setSaved((prev) => {
+        const next = new Set(prev);
+        next.delete(placeId);
+        return next;
+      });
+      removeSaved(placeId).catch(reportWriteError);
+    },
+    [reportWriteError],
+  );
 
   const toggleVisited = useCallback(() => {
     if (!user) {
@@ -276,6 +342,21 @@ export function App() {
     setQuery("");
     setCategories(new Set());
   }, []);
+
+  // the saved spots, in save order, that still exist in the catalog
+  const savedList = useMemo(
+    () => [...saved].map((id) => spotsById[id]).filter((s): s is Spot => Boolean(s)),
+    [saved, spotsById],
+  );
+
+  // jump the carousel to a specific spot (clearing filters first if it's hidden)
+  const goToSpot = useCallback(
+    (placeId: string) => {
+      if (!filtered.some((s) => s.google_place_id === placeId)) clearFilters();
+      setPendingTarget(placeId);
+    },
+    [filtered, clearFilters],
+  );
 
   const activeFilters =
     (query.trim() ? 1 : 0) +
@@ -380,10 +461,13 @@ export function App() {
           <div className="brand-text">
             <h1>Where to next</h1>
             <p>Date spots around Addis · sourced from the people who actually went</p>
+            <div className="brand-count brand-count-mobile">
+              {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+            </div>
           </div>
         </div>
         <div className="topbar-right">
-          <div className="brand-count">
+          <div className="brand-count brand-count-desktop">
             {spots.length} places{user ? ` · ${visited.length} visited` : ""}
           </div>
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
@@ -480,12 +564,73 @@ export function App() {
           onNext={() => go(1)}
           isVisited={isVisited}
           onToggleVisited={toggleVisited}
+          isSaved={isSaved}
+          onToggleSaved={toggleSaved}
         />
       ) : (
         <div className="noresults">
           No spots match these filters.{" "}
           <button onClick={clearFilters}>Clear filters</button>
         </div>
+      )}
+
+      {user && savedList.length > 0 && (
+        <section className="saved-section">
+          <div className="vs-head">
+            <h3>
+              <button
+                className="saved-toggle"
+                onClick={toggleSavedOpen}
+                aria-expanded={savedOpen}
+                aria-controls="want-to-go-list"
+              >
+                Want to go
+                <ChevIcon open={savedOpen} />
+              </button>
+            </h3>
+            <span className="vs-sub">{savedList.length} saved</span>
+          </div>
+          <div
+            id="want-to-go-list"
+            className={"saved-collapse" + (savedOpen ? " open" : "")}
+          >
+          <div className="saved-list">
+            {savedList.map((s) => (
+              <div
+                key={s.google_place_id}
+                className="saved-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => goToSpot(s.google_place_id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    goToSpot(s.google_place_id);
+                  }
+                }}
+              >
+                <div className="saved-main">
+                  <span className="saved-name">{s.name}</span>
+                  <span className="saved-meta">
+                    {s.neighborhood ?? "Addis Ababa"}
+                    {s.price_level != null ? ` · ${PRICE_LABELS[s.price_level]}` : ""}
+                  </span>
+                </div>
+                <button
+                  className="saved-remove"
+                  aria-label={`Remove ${s.name} from your want-to-go list`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeSavedSpot(s.google_place_id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          </div>
+        </section>
       )}
 
       <section className="visited-section">
