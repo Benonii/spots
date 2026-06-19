@@ -1,4 +1,4 @@
-import L from "leaflet";
+import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
@@ -127,32 +127,42 @@ const TILE = {
 
 function LeafletMap({ spot }: { spot: Spot }) {
   const elRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const markerRef = useRef<Leaflet.Marker | null>(null);
 
-  // init once (StrictMode-safe: cleanup tears the map down)
+  // init once (StrictMode-safe: cleanup tears the map down). Leaflet is loaded
+  // on demand so its ~150KB stays out of the initial bundle.
   useEffect(() => {
     if (!elRef.current || mapRef.current) return;
-    const map = L.map(elRef.current, {
-      zoomControl: true,
-      attributionControl: true,
-      scrollWheelZoom: false,
-    }).setView([spot.lat, spot.lng], 14);
-    mapRef.current = map;
-    L.tileLayer(TILE.url, { attribution: TILE.attr, maxZoom: 19 }).addTo(map);
-    const icon = L.divIcon({
-      className: "spot-pin-wrap",
-      html: '<span class="spot-pin"></span>',
-      iconSize: [30, 30],
-      iconAnchor: [15, 28],
+    let cancelled = false;
+    let teardown = () => {};
+    void import("leaflet").then(({ default: L }) => {
+      if (cancelled || !elRef.current || mapRef.current) return;
+      const map = L.map(elRef.current, {
+        zoomControl: true,
+        attributionControl: true,
+        scrollWheelZoom: false,
+      }).setView([spot.lat, spot.lng], 14);
+      mapRef.current = map;
+      L.tileLayer(TILE.url, { attribution: TILE.attr, maxZoom: 19 }).addTo(map);
+      const icon = L.divIcon({
+        className: "spot-pin-wrap",
+        html: '<span class="spot-pin"></span>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 28],
+      });
+      markerRef.current = L.marker([spot.lat, spot.lng], { icon }).addTo(map);
+      const t = setTimeout(() => map.invalidateSize(), 60);
+      teardown = () => {
+        clearTimeout(t);
+        map.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      };
     });
-    markerRef.current = L.marker([spot.lat, spot.lng], { icon }).addTo(map);
-    const t = setTimeout(() => map.invalidateSize(), 60);
     return () => {
-      clearTimeout(t);
-      map.remove();
-      mapRef.current = null;
-      markerRef.current = null;
+      cancelled = true;
+      teardown();
     };
   }, []);
 

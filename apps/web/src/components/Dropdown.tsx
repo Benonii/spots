@@ -7,11 +7,13 @@ export function Dropdown({
   options,
   onChange,
   align = "left",
+  ariaLabel,
 }: {
   value: string;
   options: Option[];
   onChange: (v: string) => void;
   align?: "left" | "right";
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -42,6 +44,7 @@ export function Dropdown({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel ? `${ariaLabel}: ${sel ? sel.label : ""}` : undefined}
       >
         <span className="dd-value">{sel ? sel.label : ""}</span>
         <span className="dd-caret" aria-hidden="true">
