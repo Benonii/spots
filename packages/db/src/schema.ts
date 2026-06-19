@@ -189,14 +189,14 @@ export const spots = pgTable(
  * subjective scores; null until rated. In the future these feed back into a
  * spot's overall rating + per-dimension scores alongside the data-derived ones.
  *
- * SECURITY: scoped to the signed-in user via Supabase Anonymous Auth. Every
- * visitor is silently signed in (no login UI) and gets the `authenticated` role
- * with a stable `auth.uid()`; `user_id` defaults to that id on insert, and all
- * four policies require `auth.uid() = user_id`, so a person can only see and
- * edit their own log. `user_id` stays nullable so the pre-auth rows survive the
- * migration — those legacy rows (null owner) are simply invisible until
- * backfilled to a real id. An anonymous user can later link an email to make
- * the same history durable across devices.
+ * SECURITY: writes are owner-scoped via Google Auth — `user_id` defaults to the
+ * caller's `auth.uid()` on insert, and insert/update/delete all require
+ * `auth.uid() = user_id`, so you can only touch your own rows. READS are public:
+ * notes are public reviews shown in the community "everyone's been" table, so
+ * the select policy is open to any signed-in user. Author name/avatar for that
+ * table come from the `profiles` table (joined on user_id). `user_id` stays
+ * nullable so pre-auth rows survive; those legacy null-owner rows are filtered
+ * out of the community feed.
  */
 export const visits = pgTable(
   "visits",
@@ -229,7 +229,9 @@ export const visits = pgTable(
   (t) => [
     index("visits_place_idx").on(t.googlePlaceId),
     index("visits_user_idx").on(t.userId),
-    // Owner-scoped: a signed-in user only ever touches their own rows.
+    // Reads are PUBLIC: every signed-in user sees everyone's visits (the notes
+    // are public reviews, surfaced in the community "everyone's been" table).
+    // Writes stay owner-scoped — you can only insert/edit/delete your own rows.
     // `(select auth.uid())` is wrapped so Postgres caches it per-statement.
     // NB: the policy *names* are inherited from the pre-auth migration (hence
     // the now-inaccurate "anon" prefix) so drizzle-kit sees in-place changes
@@ -237,7 +239,7 @@ export const visits = pgTable(
     pgPolicy("public read visits", {
       for: "select",
       to: authenticatedRole,
-      using: sql`(select auth.uid())::text = ${t.userId}`,
+      using: sql`true`,
     }),
     pgPolicy("anon insert visits", {
       for: "insert",
@@ -254,6 +256,50 @@ export const visits = pgTable(
       for: "delete",
       to: authenticatedRole,
       using: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* profiles — public display identity (name + avatar) for the community feed */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A public-readable display profile per user, so the community "everyone's been"
+ * table can show who wrote a review. The client upserts its own row from the
+ * Google session (name + avatar) on sign-in. We keep this separate from
+ * `auth.users` (which isn't directly readable by the `authenticated` role) so
+ * no SECURITY DEFINER view is needed — the feed just joins visits -> profiles.
+ *
+ * `id` equals `auth.uid()`. Anyone signed in can read all profiles (display data
+ * only — no email); a user may only write their own (`auth.uid() = id`).
+ */
+export const profiles = pgTable(
+  "profiles",
+  {
+    id: text("id").primaryKey(), // = auth.uid()
+    displayName: text("display_name"),
+    avatarUrl: text("avatar_url"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    pgPolicy("public read profiles", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`true`,
+    }),
+    pgPolicy("insert own profile", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(select auth.uid())::text = ${t.id}`,
+    }),
+    pgPolicy("update own profile", {
+      for: "update",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.id}`,
+      withCheck: sql`(select auth.uid())::text = ${t.id}`,
     }),
   ],
 );

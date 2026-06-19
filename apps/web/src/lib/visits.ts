@@ -1,13 +1,12 @@
-import { supabase, ensureSession } from "./supabase";
-import type { VisitedEntry, VisitPatch } from "./types";
+import { supabase } from "./supabase";
+import { fetchProfiles } from "./profiles";
+import type { CommunityVisit, VisitedEntry, VisitPatch } from "./types";
 
 /**
- * CRUD for the `visits` table — the "Places we've been" log, persisted to
- * Supabase and scoped to the signed-in (anonymous) user by RLS. Every read and
- * write calls ensureSession() first: it's cheap once a session exists, and it
- * self-heals the first-write-after-enabling case by retrying the sign-in. The
- * row's user_id is stamped server-side from auth.uid() (column default), so the
- * client never sends it. See packages/db/src/schema.ts.
+ * CRUD for the `visits` table — the "Places we've been" log. Writes are
+ * owner-scoped (user_id stamped server-side from auth.uid()); reads are public,
+ * so `fetchVisits` filters to the signed-in user for the personal log while
+ * `fetchCommunityVisits` returns everyone's reviews. See packages/db/src/schema.ts.
  */
 
 const num = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -31,14 +30,30 @@ function rowToEntry(r: Row): VisitedEntry {
   };
 }
 
-export async function fetchVisits(): Promise<VisitedEntry[]> {
-  await ensureSession();
+/** The signed-in user's own log (reads are public now, so filter by owner). */
+export async function fetchVisits(userId: string): Promise<VisitedEntry[]> {
   const { data, error } = await supabase
     .from("visits")
     .select("*")
+    .eq("user_id", userId)
     .order("visited_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map(rowToEntry);
+}
+
+/** Everyone's reviews (visits that carry a note), newest first, with authors. */
+export async function fetchCommunityVisits(limit = 60): Promise<CommunityVisit[]> {
+  const { data, error } = await supabase
+    .from("visits")
+    .select("*")
+    .not("notes", "is", null)
+    .neq("notes", "")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map(rowToEntry).filter((e) => e.userId && e.notes.trim());
+  const profiles = await fetchProfiles([...new Set(rows.map((r) => r.userId!))]);
+  return rows.map((r) => ({ ...r, author: r.userId ? profiles[r.userId] ?? null : null }));
 }
 
 export async function createVisit(input: {
@@ -48,7 +63,6 @@ export async function createVisit(input: {
   rating?: number;
   notes?: string;
 }): Promise<VisitedEntry> {
-  await ensureSession();
   const { data, error } = await supabase
     .from("visits")
     .insert({
@@ -65,7 +79,6 @@ export async function createVisit(input: {
 }
 
 export async function updateVisit(id: string, patch: VisitPatch): Promise<void> {
-  await ensureSession();
   // VisitPatch keys are identical to the column names, so it maps 1:1.
   const { error } = await supabase
     .from("visits")
@@ -75,13 +88,11 @@ export async function updateVisit(id: string, patch: VisitPatch): Promise<void> 
 }
 
 export async function deleteVisit(id: string): Promise<void> {
-  await ensureSession();
   const { error } = await supabase.from("visits").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
 export async function deleteVisitsByPlace(placeId: string): Promise<void> {
-  await ensureSession();
   const { error } = await supabase
     .from("visits")
     .delete()

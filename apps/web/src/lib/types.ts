@@ -67,6 +67,18 @@ export type VisitPatch = Partial<
   >
 >;
 
+/** Public display identity (from the `profiles` table). */
+export type Profile = {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
+/** A visit shown in the community "everyone's been" feed, with its author. */
+export type CommunityVisit = VisitedEntry & {
+  author: Profile | null;
+};
+
 /** Our subjective slider dimensions (note: "portions" replaces "value"). */
 export const VISIT_DIMS = [
   ["aesthetic", "Aesthetic"],

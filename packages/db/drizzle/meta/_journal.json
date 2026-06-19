@@ -43,6 +43,13 @@
       "when": 1781729597199,
       "tag": "0005_rapid_hellion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781898655696,
+      "tag": "0006_wet_legion",
+      "breakpoints": true
     }
   ]
 }
