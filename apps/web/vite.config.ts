@@ -41,6 +41,19 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
+            // Public spots catalog (PostgREST GET). NetworkFirst: fresh when
+            // online, last-loaded list when offline. Per-user/auth endpoints
+            // (visits, saved, profiles) are intentionally NOT cached.
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/rest\/v1\/spots.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "spots-data",
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 14 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Re-hosted spot covers in Supabase Storage — rarely change.
             urlPattern: /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
             handler: "StaleWhileRevalidate",

@@ -452,6 +452,22 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .appstate h2 { font-family: var(--serif-d); font-weight: 500; color: var(--ink); margin: 0 0 8px; }
 .appstate p { margin: 0; font-size: 0.9375rem; color: var(--muted); }
 .appstate code { background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 2px 7px; font-size: 0.875rem; }
+.appstate p { max-width: 38ch; margin-inline: auto; }
+.appstate-actions { margin-top: 22px; }
+.appstate-btn {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 9px;
+  padding: 11px 22px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.appstate-btn:hover { background: color-mix(in oklab, var(--accent) 88%, #000); }
+.appstate-btn:active { transform: translateY(1px); }
+.appstate-detail { margin-top: 18px; font-size: 0.8125rem; color: var(--line); }
 
 @media (max-width: 900px) {
   /* filter bar on top; the panel drops over the spot card as a glassy overlay */

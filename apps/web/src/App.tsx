@@ -100,11 +100,26 @@ export function App() {
     setWriteError(e instanceof Error ? e.message : String(e));
   }, []);
 
-  useEffect(() => {
+  const loadSpots = useCallback(() => {
+    setError(null);
     fetchSpots()
       .then(setSpots)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  useEffect(() => {
+    loadSpots();
+  }, [loadSpots]);
+
+  // Auto-recover when the connection comes back, but only if we failed or never
+  // loaded — no need to re-fetch when spots are already on screen.
+  useEffect(() => {
+    const onOnline = () => {
+      if (error || !spots) loadSpots();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [error, spots, loadSpots]);
 
   // track the Google session (and the OAuth redirect back into the app)
   useEffect(() => {
@@ -398,10 +413,21 @@ export function App() {
   }, [go]);
 
   if (error) {
+    const offline = typeof navigator !== "undefined" && !navigator.onLine;
     return (
       <div className="appstate">
-        <h2>Couldn't load spots</h2>
-        <p>{error}</p>
+        <h2>{offline ? "You're offline" : "Couldn't load spots"}</h2>
+        <p>
+          {offline
+            ? "Spots load over the network. Reconnect and try again — places you've already opened stay cached."
+            : "We couldn't reach the server. Check your connection and try again."}
+        </p>
+        <div className="appstate-actions">
+          <button className="appstate-btn" onClick={loadSpots}>
+            Try again
+          </button>
+        </div>
+        <p className="appstate-detail">{error}</p>
       </div>
     );
   }
