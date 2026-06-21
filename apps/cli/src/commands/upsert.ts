@@ -11,7 +11,7 @@ import { consola } from "consola";
 import { inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "../db.ts";
 import { aggregateSpot, type VideoForAgg } from "../aggregate.ts";
-import { ensureCoversBucket, rehostCover, storageConfigured } from "../lib/storage.ts";
+import { ensureCoversBucket, isRehosted, rehostCover, storageConfigured } from "../lib/storage.ts";
 
 export const upsertCommand = defineCommand({
   meta: {
@@ -57,6 +57,20 @@ export const upsertCommand = defineCommand({
       }
     }
 
+    // Existing covers, so a re-run never clobbers a permanent Storage URL with
+    // an expired TikTok thumbnail (rehostCover returns null once the source
+    // dies, and we must not fall back to the dead raw URL).
+    const existingCovers = new Map<string, string | null>();
+    {
+      const existing = await db
+        .select({
+          placeId: schema.spots.googlePlaceId,
+          cover: schema.spots.coverImageUrl,
+        })
+        .from(schema.spots);
+      for (const e of existing) existingCovers.set(e.placeId, e.cover);
+    }
+
     let upserted = 0;
     for (const [placeId, group] of groups) {
       const videos: VideoForAgg[] = group.map((r) => ({
@@ -72,10 +86,16 @@ export const upsertCommand = defineCommand({
       const geo = best.geo!;
       const name = best.extraction!.venueName ?? "Unknown";
 
-      let coverImageUrl = best.thumbnailUrl;
-      if (useStorage) {
+      const prevCover = existingCovers.get(placeId) ?? null;
+      let coverImageUrl = prevCover ?? best.thumbnailUrl;
+      if (useStorage && isRehosted(prevCover)) {
+        // Already permanently hosted — keep it; never re-fetch the expiring source.
+        coverImageUrl = prevCover!;
+      } else if (useStorage) {
         try {
           const hosted = await rehostCover(placeId, best.thumbnailUrl);
+          // On failure (expired source) keep the previous value rather than
+          // overwriting with a now-dead raw thumbnail URL.
           if (hosted) coverImageUrl = hosted;
         } catch (e) {
           consola.warn(`  cover re-host failed for ${name}: ${(e as Error).message}`);
