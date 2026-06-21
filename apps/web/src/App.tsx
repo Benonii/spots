@@ -69,6 +69,17 @@ function ChevIcon({ open }: { open: boolean }) {
   );
 }
 
+/** Map any thrown value to safe, human copy — raw errors (TypeError, "Failed to
+ * fetch", stacks) must never reach the UI in production. */
+function friendlyError(e: unknown): string {
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  const msg = e instanceof Error ? e.message : String(e);
+  if (offline || /fail(ed)? to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return "You're offline — changes will sync when you reconnect.";
+  }
+  return "Couldn't save your changes. Please try again.";
+}
+
 export function App() {
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +108,8 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
 
   const reportWriteError = useCallback((e: unknown) => {
-    setWriteError(e instanceof Error ? e.message : String(e));
+    if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
+    setWriteError(friendlyError(e));
   }, []);
 
   const loadSpots = useCallback(() => {
@@ -115,6 +127,7 @@ export function App() {
   // loaded — no need to re-fetch when spots are already on screen.
   useEffect(() => {
     const onOnline = () => {
+      setWriteError(null); // drop any stale "you're offline" notice
       if (error || !spots) loadSpots();
     };
     window.addEventListener("online", onOnline);
@@ -145,6 +158,7 @@ export function App() {
       .then(async (rows) => {
         const migrated = await migrateLegacyVisits(rows);
         setVisited(migrated.length ? [...migrated, ...rows] : rows);
+        setWriteError(null); // sync succeeded — clear any prior notice
       })
       .catch(reportWriteError);
     fetchSaved(user.id).then((ids) => setSaved(new Set(ids))).catch(reportWriteError);
@@ -427,7 +441,6 @@ export function App() {
             Try again
           </button>
         </div>
-        <p className="appstate-detail">{error}</p>
       </div>
     );
   }
@@ -664,7 +677,7 @@ export function App() {
           <h3>Places we've been</h3>
           <span className="vs-sub">
             {writeError ? (
-              <span className="vs-error">Couldn't sync: {writeError}</span>
+              <span className="vs-error">{writeError}</span>
             ) : user ? (
               <>{visited.length} logged · saved to your account</>
             ) : (

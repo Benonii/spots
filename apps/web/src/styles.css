@@ -467,7 +467,6 @@ a.spot-cover:hover { filter: brightness(1.06); }
 }
 .appstate-btn:hover { background: color-mix(in oklab, var(--accent) 88%, #000); }
 .appstate-btn:active { transform: translateY(1px); }
-.appstate-detail { margin-top: 18px; font-size: 0.8125rem; color: var(--line); }
 
 @media (max-width: 900px) {
   /* filter bar on top; the panel drops over the spot card as a glassy overlay */
