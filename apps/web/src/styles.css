@@ -79,41 +79,33 @@ body {
 .auth-btn:hover { border-color: var(--sage); background: var(--surface-2); transform: translateY(-1px); }
 .auth-btn svg { flex: none; }
 
-/* Register --frame as a real <color> so it can transition smoothly on hover.
-   (A plain custom property would jump rather than animate.) */
-@property --frame {
-  syntax: "<color>";
-  inherits: false;
-  initial-value: #e2d7c2;
-}
-
-/* topbar link into the dedicated "Near me" page — framed with corner brackets
-   instead of a full border. The frame is 8 tiny solid bars painted as
-   background layers, two per corner (one horizontal arm, one vertical arm). */
+/* topbar link into the dedicated "Near me" page — framed with rounded corner
+   brackets. A ::before overlay draws a full rounded border, then a mask hides
+   everything except a small square at each corner, so only the rounded elbows
+   (plus a short arm) remain. --len controls how far the arms reach, --rad how
+   round the elbow is. */
 .near-link {
   --frame: var(--line);   /* bracket colour */
-  --len: 11px;            /* arm length */
-  --th: 1.5px;            /* arm thickness */
-  --bar: linear-gradient(var(--frame) 0 0); /* a solid-colour image */
+  --len: 9px;             /* corner reach (arm length incl. the curve) */
+  --th: 1.6px;            /* line thickness */
+  --rad: 7px;             /* elbow roundness */
+  position: relative;
   display: inline-flex; align-items: center; gap: 7px; flex: none; cursor: pointer;
   font-family: var(--serif-b); font-size: 0.8438rem; color: var(--ink);
-  text-decoration: none;
-  background-image:
-    var(--bar), var(--bar), var(--bar), var(--bar),
-    var(--bar), var(--bar), var(--bar), var(--bar);
-  background-repeat: no-repeat;
-  background-position:
-    0 0,        0 0,        /* top-left:     arm →, arm ↓ */
-    100% 0,     100% 0,     /* top-right:    arm ←, arm ↓ */
-    0 100%,     0 100%,     /* bottom-left:  arm →, arm ↑ */
-    100% 100%,  100% 100%;  /* bottom-right: arm ←, arm ↑ */
-  background-size:
-    var(--len) var(--th), var(--th) var(--len),
-    var(--len) var(--th), var(--th) var(--len),
-    var(--len) var(--th), var(--th) var(--len),
-    var(--len) var(--th), var(--th) var(--len);
-  border: 0; border-radius: 2px; padding: 9px 14px;
-  transition: --frame 0.15s ease, color 0.15s ease, transform 0.12s ease;
+  text-decoration: none; background: transparent;
+  border: 0; padding: 9px 14px;
+  transition: color 0.15s ease, transform 0.12s ease;
+}
+.near-link::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: var(--th) solid var(--frame); border-radius: var(--rad);
+  /* one mask square per corner; the rest of the border is masked away */
+  --sq: linear-gradient(#000 0 0);
+  -webkit-mask: var(--sq) 0 0, var(--sq) 100% 0, var(--sq) 0 100%, var(--sq) 100% 100%;
+          mask: var(--sq) 0 0, var(--sq) 100% 0, var(--sq) 0 100%, var(--sq) 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: var(--len) var(--len); mask-size: var(--len) var(--len);
+  transition: border-color 0.15s ease;
 }
 .near-link:hover { --frame: var(--accent-text); color: var(--accent-text); transform: translateY(-1px); }
 .near-link svg { flex: none; }
