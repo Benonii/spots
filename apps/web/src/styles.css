@@ -90,10 +90,12 @@ body {
   --th: 1.6px;            /* line thickness */
   --rad: 7px;             /* elbow roundness */
   position: relative;
-  display: inline-flex; align-items: center; gap: 7px; flex: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 9px; flex: none; cursor: pointer;
   font-family: var(--serif-b); font-size: 0.8438rem; color: var(--ink);
   text-decoration: none; background: transparent;
-  border: 0; padding: 7px 11px;
+  /* no border (brackets stand in), so +1px padding to match the bordered
+     sign-in pill's outer height */
+  border: 0; padding: 9px 16px;
   transition: color 0.15s ease, transform 0.12s ease;
 }
 .near-link::before {
@@ -571,10 +573,11 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .near-actions { flex-direction: column; }
   .near-item { gap: 11px; }
 
-  /* topbar gets tight next to the brand + sign-in: drop "Near me" to an icon,
-     the tooltip carries its label */
-  .near-link-label { display: none; }
-  .near-link { padding: 7px; gap: 0; --len: 9px; }
+  /* topbar gets tight next to the brand: drop both "Near me" and "Sign in" to
+     equally-sized icon buttons, their tooltips carry the labels */
+  .near-link-label, .auth-btn-label { display: none; }
+  .near-link { padding: 9px; gap: 0; --len: 9px; }
+  .auth-btn { padding: 8px; gap: 0; }
 }
 
 @media (max-width: 900px) {
