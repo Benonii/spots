@@ -38,14 +38,13 @@ export function formatDistance(km: number): string {
 /**
  * Estimate road distance from straight-line distance with a flat factor.
  *
- * Calibrated against Google driving distances from a real Addis origin (6 spots:
- * mean Google/straight = 1.74×, CV 11% — consistent, with no distance trend, so
- * a constant fits better than a power curve). A 2,086-pair OSRM sweep agreed the
- * exponent is ~0.94 (i.e. flat). Still an estimate, not routing: circuity does
- * vary by origin (well-connected ~1.4×, constrained/peripheral ~1.75×), so this
- * leans slightly conservative. Retune ROAD_FACTOR with more origins if needed.
+ * Still an estimate, not routing: circuity varies by where you start (sweeps put
+ * well-connected/main-road origins near ~1.3–1.4× and constrained/residential
+ * ones — like the calibration pin — near ~1.74×). No single constant is right
+ * everywhere, so 1.6 is a city-wide compromise chosen to lean toward overshoot
+ * (preferred over undershoot). Expect ~±15–20% per spot. Retune if needed.
  */
-const ROAD_FACTOR = 1.7;
+const ROAD_FACTOR = 1.6;
 export function estimateRoadKm(straightKm: number): number {
   return Math.max(0, straightKm) * ROAD_FACTOR;
 }
