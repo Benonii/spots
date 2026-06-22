@@ -86,7 +86,7 @@ body {
    round the elbow is. */
 .near-link {
   --frame: var(--line);   /* bracket colour */
-  --len: 14px;            /* corner reach (arm length incl. the curve) */
+  --len: 12px;            /* corner reach (arm length incl. the curve) */
   --th: 1.6px;            /* line thickness */
   --rad: 7px;             /* elbow roundness */
   position: relative;
