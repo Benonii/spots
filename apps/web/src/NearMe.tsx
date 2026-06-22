@@ -56,8 +56,15 @@ function NearItem({ spot, km }: Ranked) {
       </div>
       <span className="near-dist">{formatDistance(km)}</span>
       <span className="near-actions">
-        <a className="action-btn" href={mapsUrl(spot)} target="_blank" rel="noreferrer">
-          <PinIcon /> Map
+        <a
+          className="action-btn"
+          href={mapsUrl(spot)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Map of ${spot.name}`}
+        >
+          <PinIcon />
+          <span className="abtn-label">Map</span>
         </a>
         {spot.source_video_url && (
           <a
@@ -65,9 +72,11 @@ function NearItem({ spot, km }: Ranked) {
             href={spot.source_video_url}
             target="_blank"
             rel="noreferrer"
+            aria-label={`Watch ${spot.name} on TikTok`}
             onClick={(e) => openTikTok(e, spot.source_video_url!)}
           >
-            <TikTokIcon /> Watch
+            <TikTokIcon />
+            <span className="abtn-label">Watch</span>
           </a>
         )}
       </span>

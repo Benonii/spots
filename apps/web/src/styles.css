@@ -570,8 +570,21 @@ a.spot-cover:hover { filter: brightness(1.06); }
 @keyframes near-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 560px) {
-  .near-actions { flex-direction: column; }
-  .near-item { gap: 11px; }
+  /* near list: Map/Watch become icon-only buttons in a row, and type shrinks a
+     step so names get room to breathe instead of truncating */
+  .near-item { gap: 11px; padding: 10px 12px; }
+  .near-cover { width: 46px; height: 46px; }
+  .near-name { font-size: 0.9375rem; }
+  .near-meta { font-size: 0.75rem; }
+  .near-dist { font-size: 0.75rem; padding: 3px 9px; }
+  .near-actions { gap: 6px; }
+  .near-actions .abtn-label { display: none; }
+  .near-actions .action-btn { padding: 8px; border-radius: 11px; gap: 0; }
+
+  /* header: let the title/subtitle column shrink so the subtitle wraps */
+  .near-title > div { min-width: 0; }
+  .near-title h1 { font-size: 1.375rem; }
+  .near-title p { font-size: 0.8125rem; }
 
   /* topbar gets tight next to the brand: drop both "Near me" and "Sign in" to
      equally-sized icon buttons, their tooltips carry the labels */
