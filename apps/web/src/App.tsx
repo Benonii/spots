@@ -24,6 +24,7 @@ import { VisitedTable } from "./components/VisitedTable";
 import { CommunityTable } from "./components/CommunityTable";
 import { AuthButton } from "./components/AuthButton";
 import { BrandMark } from "./components/BrandMark";
+import { Tooltip } from "./components/Tooltip";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -520,9 +521,12 @@ export function App() {
           <div className="brand-count brand-count-desktop">
             {spots.length} places{user ? ` · ${visited.length} visited` : ""}
           </div>
-          <Link to="/near" className="near-link">
-            <NearIcon /> Near me
-          </Link>
+          <Tooltip label="Near me">
+            <Link to="/near" className="near-link" aria-label="Near me">
+              <NearIcon />
+              <span className="near-link-label">Near me</span>
+            </Link>
+          </Tooltip>
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>
