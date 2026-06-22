@@ -86,14 +86,14 @@ body {
    round the elbow is. */
 .near-link {
   --frame: var(--line);   /* bracket colour */
-  --len: 9px;             /* corner reach (arm length incl. the curve) */
+  --len: 7px;             /* corner reach (arm length incl. the curve) */
   --th: 1.6px;            /* line thickness */
   --rad: 7px;             /* elbow roundness */
   position: relative;
   display: inline-flex; align-items: center; gap: 7px; flex: none; cursor: pointer;
   font-family: var(--serif-b); font-size: 0.8438rem; color: var(--ink);
   text-decoration: none; background: transparent;
-  border: 0; padding: 9px 14px;
+  border: 0; padding: 7px 11px;
   transition: color 0.15s ease, transform 0.12s ease;
 }
 .near-link::before {
@@ -574,7 +574,7 @@ a.spot-cover:hover { filter: brightness(1.06); }
   /* topbar gets tight next to the brand + sign-in: drop "Near me" to an icon,
      the tooltip carries its label */
   .near-link-label { display: none; }
-  .near-link { padding: 9px; gap: 0; }
+  .near-link { padding: 7px; gap: 0; }
 }
 
 @media (max-width: 900px) {
