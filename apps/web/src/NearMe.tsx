@@ -4,7 +4,7 @@ import type { Spot } from "./lib/types";
 import { fetchSpots } from "./lib/supabase";
 import { PRICE_LABELS, coverImage, mapsUrl } from "./lib/format";
 import { openTikTok } from "./lib/tiktok";
-import { formatDistance, haversineKm, useGeolocation } from "./lib/geo";
+import { estimateRoadKm, formatDistance, haversineKm, useGeolocation } from "./lib/geo";
 import { BrandMark } from "./components/BrandMark";
 
 const RADII = [
@@ -41,9 +41,9 @@ function TikTokIcon() {
   );
 }
 
-type Ranked = { spot: Spot; km: number };
+type Ranked = { spot: Spot; km: number; roadKm: number };
 
-function NearItem({ spot, km }: Ranked) {
+function NearItem({ spot, roadKm }: Ranked) {
   return (
     <li className="near-item">
       <span className="near-cover" style={{ backgroundImage: coverImage(spot) }} aria-hidden="true" />
@@ -54,7 +54,10 @@ function NearItem({ spot, km }: Ranked) {
           {spot.price_level != null ? ` · ${PRICE_LABELS[spot.price_level]}` : ""}
         </span>
       </div>
-      <span className="near-dist">{formatDistance(km)}</span>
+      {/* estimated road distance (~) — see estimateRoadKm; not real routing */}
+      <span className="near-dist" title="Estimated travel distance">
+        ~{formatDistance(roadKm)}
+      </span>
       <span className="near-actions">
         <a
           className="action-btn"
@@ -104,12 +107,16 @@ export function NearMe() {
     if (!spots || !geo.coords) return [];
     const here = geo.coords;
     return spots
-      .map((s) => ({ spot: s, km: haversineKm(here, { lat: s.lat, lng: s.lng }) }))
+      .map((s) => {
+        const km = haversineKm(here, { lat: s.lat, lng: s.lng });
+        return { spot: s, km, roadKm: estimateRoadKm(km) };
+      })
       .sort((a, b) => a.km - b.km);
   }, [spots, geo.coords]);
 
+  // radius is in travel terms now, so filter on the road estimate
   const within = useMemo(
-    () => ranked.filter((r) => r.km <= radius),
+    () => ranked.filter((r) => r.roadKm <= radius),
     [ranked, radius],
   );
 
@@ -164,6 +171,23 @@ export function NearMe() {
         <p>Finding spots near you…</p>
       </div>
     );
+  } else if (geo.coarse) {
+    // The fix is too rough (IP/Wi-Fi fallback, common on desktops) to rank by
+    // distance honestly — don't show fabricated metres off a multi-km error.
+    const accLabel = geo.accuracy ? formatDistance(geo.accuracy / 1000) : "a few km";
+    body = (
+      <div className="near-state">
+        <h2>Location too approximate</h2>
+        <p>
+          Your device could only place you within about {accLabel}, which is too
+          rough to rank spots by distance. Open this on your phone for GPS, or
+          try again.
+        </p>
+        <button className="appstate-btn" onClick={geo.request}>
+          Try again
+        </button>
+      </div>
+    );
   } else {
     body = (
       <>
@@ -186,7 +210,7 @@ export function NearMe() {
         {within.length ? (
           <ul className="near-list">
             {within.map((r) => (
-              <NearItem key={r.spot.google_place_id} spot={r.spot} km={r.km} />
+              <NearItem key={r.spot.google_place_id} {...r} />
             ))}
           </ul>
         ) : (

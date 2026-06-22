@@ -8,6 +8,11 @@ export type Coords = { lat: number; lng: number };
 const ADDIS: Coords = { lat: 9.0108, lng: 38.7613 };
 const ADDIS_RADIUS_KM = 60;
 
+/** Above this reported accuracy radius (metres) a fix can't give trustworthy
+ * distances — it's almost certainly an IP/Wi-Fi fallback, not GPS. Desktops
+ * with no GPS routinely report several km here. */
+const COARSE_ACCURACY_M = 1000;
+
 const EARTH_KM = 6371;
 const toRad = (d: number) => (d * Math.PI) / 180;
 
@@ -30,6 +35,19 @@ export function formatDistance(km: number): string {
   return `${Math.round(km)} km`;
 }
 
+/**
+ * Estimate road distance from straight-line distance. Addis roads run longer
+ * than the crow flies, and the gap *widens* with distance (short hops ~1.3×,
+ * cross-town ~2×) because longer trips can't avoid detours around the terrain
+ * and major arteries. Modelled as ratio = 1.15 · km^0.2, floored at 1.3×.
+ * This is a calibrated estimate, not real routing — see lib/geo.ts notes.
+ */
+export function estimateRoadKm(straightKm: number): number {
+  if (straightKm <= 0) return 0;
+  const ratio = Math.max(1.3, 1.15 * Math.pow(straightKm, 0.2));
+  return straightKm * ratio;
+}
+
 export function isNearAddis(c: Coords): boolean {
   return haversineKm(c, ADDIS) <= ADDIS_RADIUS_KM;
 }
@@ -43,6 +61,10 @@ export type GeoStatus =
 
 export type GeoState = {
   coords: Coords | null;
+  /** Reported accuracy radius of the fix, in metres (95% confidence). */
+  accuracy: number | null;
+  /** Fix is too imprecise for trustworthy distances (IP/Wi-Fi fallback). */
+  coarse: boolean;
   status: GeoStatus;
   /** We have a fix, but it's well outside Addis (distances won't be useful). */
   farFromAddis: boolean;
@@ -56,6 +78,7 @@ export type GeoState = {
  */
 export function useGeolocation(): GeoState {
   const [coords, setCoords] = useState<Coords | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [status, setStatus] = useState<GeoStatus>("idle");
 
   const request = useCallback(() => {
@@ -67,9 +90,11 @@ export function useGeolocation(): GeoState {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setAccuracy(pos.coords.accuracy);
         setStatus("granted");
       },
       (err) => {
+        setAccuracy(null);
         setStatus(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -77,5 +102,6 @@ export function useGeolocation(): GeoState {
   }, []);
 
   const farFromAddis = coords != null && !isNearAddis(coords);
-  return { coords, status, farFromAddis, request };
+  const coarse = accuracy != null && accuracy > COARSE_ACCURACY_M;
+  return { coords, accuracy, coarse, status, farFromAddis, request };
 }
