@@ -129,7 +129,7 @@ export function NearMe() {
         <BrandMark className="brand-mark" />
         <div>
           <h1>Near you</h1>
-          <p>Date spots closest to where you are right now</p>
+          <p>Spots closest to where you are right now</p>
         </div>
       </div>
     </header>

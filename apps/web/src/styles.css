@@ -113,18 +113,27 @@ body {
 .near-link svg { flex: none; }
 .near-link-label { white-space: nowrap; }
 
-/* tooltip (Radix primitive, styled to match) */
+/* tooltip (Radix primitive): light + as transparent as legibility allows, and
+   only shown on mobile where the topbar buttons collapse to bare icons. */
 .tooltip {
-  background: var(--ink); color: var(--bg);
+  background: color-mix(in oklab, var(--bg) 42%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  border: 1px solid color-mix(in oklab, var(--ink) 12%, transparent);
   font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600;
-  padding: 6px 10px; border-radius: 8px; line-height: 1.2;
+  padding: 5px 9px; border-radius: 8px; line-height: 1.2;
   user-select: none; z-index: 100;
   animation: tooltip-in 0.12s ease;
 }
-.tooltip-arrow { fill: var(--ink); }
+.tooltip-arrow { fill: color-mix(in oklab, var(--bg) 42%, transparent); }
 @keyframes tooltip-in {
   from { opacity: 0; transform: translateY(-2px); }
   to { opacity: 1; transform: none; }
+}
+/* desktop shows the button labels, so the tooltip would be redundant */
+@media (min-width: 561px) {
+  .tooltip { display: none; }
 }
 .auth-user { display: flex; align-items: center; gap: 9px; }
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
