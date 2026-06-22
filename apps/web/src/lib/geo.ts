@@ -36,16 +36,18 @@ export function formatDistance(km: number): string {
 }
 
 /**
- * Estimate road distance from straight-line distance. Addis roads run longer
- * than the crow flies, and the gap *widens* with distance (short hops ~1.3×,
- * cross-town ~2×) because longer trips can't avoid detours around the terrain
- * and major arteries. Modelled as ratio = 1.15 · km^0.2, floored at 1.3×.
- * This is a calibrated estimate, not real routing — see lib/geo.ts notes.
+ * Estimate road distance from straight-line distance with a flat factor.
+ *
+ * Calibrated against Google driving distances from a real Addis origin (6 spots:
+ * mean Google/straight = 1.74×, CV 11% — consistent, with no distance trend, so
+ * a constant fits better than a power curve). A 2,086-pair OSRM sweep agreed the
+ * exponent is ~0.94 (i.e. flat). Still an estimate, not routing: circuity does
+ * vary by origin (well-connected ~1.4×, constrained/peripheral ~1.75×), so this
+ * leans slightly conservative. Retune ROAD_FACTOR with more origins if needed.
  */
+const ROAD_FACTOR = 1.7;
 export function estimateRoadKm(straightKm: number): number {
-  if (straightKm <= 0) return 0;
-  const ratio = Math.max(1.3, 1.15 * Math.pow(straightKm, 0.2));
-  return straightKm * ratio;
+  return Math.max(0, straightKm) * ROAD_FACTOR;
 }
 
 export function isNearAddis(c: Coords): boolean {
