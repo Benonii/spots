@@ -8,17 +8,24 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { App } from "./App";
+import { NearMe } from "./NearMe";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
-// Single-page for v0; the router is set up so spot-detail routes can be added later.
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: App,
 });
-const router = createRouter({ routeTree: rootRoute.addChildren([indexRoute]) });
+const nearRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/near",
+  component: NearMe,
+});
+const router = createRouter({
+  routeTree: rootRoute.addChildren([indexRoute, nearRoute]),
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

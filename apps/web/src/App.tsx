@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
 import type { CommunityVisit, Spot, VisitedEntry, VisitPatch } from "./lib/types";
@@ -55,6 +56,16 @@ function SearchIcon() {
       strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />
       <path d="M13 13l-2.7-2.7" />
+    </svg>
+  );
+}
+
+function NearIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z" />
+      <circle cx="12" cy="10.5" r="2.3" />
     </svg>
   );
 }
@@ -509,6 +520,9 @@ export function App() {
           <div className="brand-count brand-count-desktop">
             {spots.length} places{user ? ` · ${visited.length} visited` : ""}
           </div>
+          <Link to="/near" className="near-link">
+            <NearIcon /> Near me
+          </Link>
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>

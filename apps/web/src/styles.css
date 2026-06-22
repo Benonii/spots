@@ -78,6 +78,17 @@ body {
 }
 .auth-btn:hover { border-color: var(--sage); background: var(--surface-2); transform: translateY(-1px); }
 .auth-btn svg { flex: none; }
+
+/* topbar link into the dedicated "Near me" page */
+.near-link {
+  display: inline-flex; align-items: center; gap: 7px; flex: none; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.8438rem; color: var(--ink);
+  text-decoration: none; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 999px; padding: 8px 15px;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+.near-link:hover { border-color: var(--accent-line); color: var(--accent-text); transform: translateY(-1px); }
+.near-link svg { flex: none; }
 .auth-user { display: flex; align-items: center; gap: 9px; }
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
 .auth-avatar-fallback {
@@ -467,6 +478,64 @@ a.spot-cover:hover { filter: brightness(1.06); }
 }
 .appstate-btn:hover { background: color-mix(in oklab, var(--accent) 88%, #000); }
 .appstate-btn:active { transform: translateY(1px); }
+
+/* ---------- "Near me" page ---------- */
+.near-page { max-width: 880px; }
+.near-top { margin-bottom: 26px; }
+.near-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8125rem; color: var(--ink-soft); text-decoration: none;
+  margin-bottom: 18px; transition: color 0.15s ease;
+}
+.near-back:hover { color: var(--accent-text); }
+.near-back svg { flex: none; }
+.near-title { display: flex; align-items: center; gap: 16px; }
+.near-title h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; color: var(--ink); }
+.near-title p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); font-style: italic; }
+
+.near-controls { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 18px; }
+.near-radius {
+  font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 16px; cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.near-radius:hover { border-color: var(--accent-line); color: var(--accent-text); }
+.near-radius.on { background: var(--green); border-color: var(--green); color: #fff; }
+
+.near-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.near-item {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px;
+}
+.near-cover {
+  width: 52px; height: 52px; flex: none; border-radius: 11px;
+  background-size: cover; background-position: center; background-color: var(--line-soft);
+}
+.near-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+.near-name { font-family: var(--serif-d); font-weight: 600; font-size: 1rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.near-meta { font-size: 0.8125rem; color: var(--muted); }
+.near-dist {
+  flex: none; font-size: 0.8125rem; font-weight: 700; color: var(--accent-text);
+  background: var(--accent-wash); border-radius: 999px; padding: 4px 11px;
+}
+.near-actions { display: flex; gap: 8px; flex: none; }
+
+.near-state { text-align: center; padding: 80px 20px; color: var(--ink-soft); }
+.near-state h2 { font-family: var(--serif-d); font-weight: 500; color: var(--ink); margin: 0 0 8px; }
+.near-state p { margin: 0 auto 18px; max-width: 40ch; font-size: 0.9375rem; color: var(--muted); }
+.near-state .appstate-btn { text-decoration: none; display: inline-block; }
+.near-spinner {
+  display: inline-block; width: 30px; height: 30px; margin-bottom: 16px;
+  border: 3px solid var(--line); border-top-color: var(--green); border-radius: 50%;
+  animation: near-spin 0.7s linear infinite;
+}
+@keyframes near-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .near-actions { flex-direction: column; }
+  .near-item { gap: 11px; }
+}
 
 @media (max-width: 900px) {
   /* filter bar on top; the panel drops over the spot card as a glassy overlay */
