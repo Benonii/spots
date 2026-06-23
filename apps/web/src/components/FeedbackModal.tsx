@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FC, type FormEvent } from "react";
 import { submitFeedback, type FeedbackKind } from "../lib/feedback";
+import { track } from "../lib/analytics";
 
 const MAX = 2000;
 
@@ -124,6 +125,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
     setStatus("sending");
     try {
       await submitFeedback({ kind, message, email });
+      void track("feedback_submit", { kind });
       setStatus("sent");
       // let the success state breathe, then close
       setTimeout(onClose, 1400);

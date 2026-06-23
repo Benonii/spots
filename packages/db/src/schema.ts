@@ -399,6 +399,52 @@ export const feedback = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* events — first-party product analytics (page views + feature usage)   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A lightweight append-only event stream for product analytics — page views and
+ * feature usage — so we can compute DAU/MAU and "most-used features" with plain
+ * SQL (see packages/db/analytics.sql, or `df analytics`).
+ *
+ * Every actor is identified by `coalesce(user_id, anon_id)`: signed-in users get
+ * their stable `auth.uid()` (stamped server-side); everyone else carries a
+ * client-generated `anon_id` persisted in localStorage. Since our audience is
+ * Addis Ababa (outside the EU cookie-consent regime) we track anonymous visitors
+ * too, which is what makes whole-population DAU/MAU possible.
+ *
+ * RLS mirrors `feedback`: anon + authenticated may INSERT (a client can only
+ * stamp its own user_id, or leave it null); there is NO select policy, so the
+ * stream is write-only from the browser and only the RLS-bypassing CLI/Studio
+ * connection can read or aggregate it. No PII beyond the optional auth id.
+ */
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(), // 'page_view', 'feedback_submit', 'surprise', …
+    props: jsonb("props").$type<Record<string, unknown>>(), // optional event detail
+    userId: text("user_id").default(sql`(auth.uid())::text`), // null for anon
+    anonId: text("anon_id"), // stable per-device id (localStorage), for anon DAU/MAU
+    path: text("path"), // route the event fired on
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("events_created_idx").on(t.createdAt.desc()),
+    index("events_name_idx").on(t.name),
+    // DAU/MAU groups by day and counts distinct actor; speeds the actor scan.
+    index("events_actor_idx").on(t.userId, t.anonId),
+    pgPolicy("anyone insert events", {
+      for: "insert",
+      to: [anonRole, authenticatedRole],
+      withCheck: sql`${t.userId} is null or (select auth.uid())::text = ${t.userId}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* source_videos — raw per-video provenance (CLI-internal, anon has no access) */
 /* ------------------------------------------------------------------ */
 
@@ -502,3 +548,6 @@ export type NewVisit = typeof visits.$inferInsert;
 
 export type Feedback = typeof feedback.$inferSelect;
 export type NewFeedback = typeof feedback.$inferInsert;
+
+export type AnalyticsEvent = typeof events.$inferSelect;
+export type NewAnalyticsEvent = typeof events.$inferInsert;

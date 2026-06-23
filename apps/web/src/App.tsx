@@ -17,6 +17,7 @@ import { upsertProfile } from "./lib/profiles";
 import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
+import { track, trackAppOpen } from "./lib/analytics";
 import { Dropdown, type Option } from "./components/Dropdown";
 import { DiceButton } from "./components/DiceButton";
 import { SpotCard } from "./components/SpotCard";
@@ -141,6 +142,11 @@ export function App() {
   useEffect(() => {
     loadSpots();
   }, [loadSpots]);
+
+  // one page-view per load (drives DAU/MAU across signed-in + anon visitors)
+  useEffect(() => {
+    trackAppOpen();
+  }, []);
 
   // Auto-recover when the connection comes back, but only if we failed or never
   // loaded — no need to re-fetch when spots are already on screen.
@@ -270,6 +276,7 @@ export function App() {
 
   const surprise = useCallback(() => {
     if (!total) return;
+    void track("surprise");
     const visitedIds = new Set(visited.map((v) => v.placeId));
     let pool = filtered
       .map((s, i) => [s, i] as const)
@@ -292,6 +299,7 @@ export function App() {
     if (!current) return;
     const placeId = current.google_place_id;
     const has = saved.has(placeId);
+    if (!has) void track("spot_save", { placeId });
     setSaved((prev) => {
       const next = new Set(prev);
       if (has) next.delete(placeId);
@@ -386,6 +394,7 @@ export function App() {
   }, []);
 
   const handleSignIn = useCallback(() => {
+    void track("sign_in_click");
     void signInWithGoogle().catch(reportWriteError);
   }, [reportWriteError]);
 
