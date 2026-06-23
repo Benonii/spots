@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FeedbackModal } from "./FeedbackModal";
+import { track } from "../lib/analytics";
 
 /**
  * Floating launcher for feedback + "What's New", pinned bottom-right.
@@ -63,7 +64,8 @@ export function FeedbackLauncher() {
     };
   }, [menuOpen]);
 
-  const openFeedback = () => {
+  const openFeedback = (source: string) => {
+    track("feedback_open", { source });
     setMenuOpen(false);
     setModalOpen(true);
   };
@@ -74,7 +76,7 @@ export function FeedbackLauncher() {
       <button
         type="button"
         className="feedback-btn"
-        onClick={() => setModalOpen(true)}
+        onClick={() => openFeedback("desktop")}
         title="Send feedback"
       >
         <FeedbackIcon />
@@ -94,7 +96,7 @@ export function FeedbackLauncher() {
             <SparkIcon />
             What's New
           </button>
-          <button type="button" className="fab-item" role="menuitem" onClick={openFeedback}>
+          <button type="button" className="fab-item" role="menuitem" onClick={() => openFeedback("mobile")}>
             <FeedbackIcon />
             Give feedback
           </button>
