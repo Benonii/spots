@@ -350,6 +350,55 @@ export const savedSpots = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* feedback — bug reports, feature requests, general notes from anyone   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Free-form feedback submitted from the app's "Send feedback" modal. Open to
+ * everyone — a visitor doesn't need to sign in to report a bug or suggest a
+ * feature — so the insert policy covers both anon and authenticated roles.
+ *
+ * `userId` is stamped from the caller's JWT when signed in (null for anon); we
+ * never trust a client-supplied id (the withCheck enforces null-or-own). There
+ * is intentionally NO select policy: with RLS on, that means nobody can read
+ * feedback through the API. The owner reads it via the RLS-bypassing CLI/Studio
+ * connection (or the Supabase dashboard). `email` is optional so we can follow
+ * up; `pageUrl`/`userAgent` give a bug report just enough context to reproduce.
+ */
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull().default("general"), // 'bug' | 'feature' | 'general'
+    message: text("message").notNull(),
+    email: text("email"), // optional reply-to
+    userId: text("user_id").default(sql`(auth.uid())::text`), // null for anon
+    pageUrl: text("page_url"), // path the user was on
+    userAgent: text("user_agent"), // browser/device, for repro
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("feedback_created_idx").on(t.createdAt.desc()),
+    check("feedback_kind_check", sql`${t.kind} in ('bug','feature','general')`),
+    // bound the payload so one row can't carry a giant blob; mirrored by the
+    // textarea maxLength client-side.
+    check(
+      "feedback_message_len_check",
+      sql`char_length(${t.message}) between 1 and 2000`,
+    ),
+    // Anyone (signed in or not) may submit; a client may only stamp its own
+    // user_id (or leave it null). No select policy => nobody reads via the API.
+    pgPolicy("anyone insert feedback", {
+      for: "insert",
+      to: [anonRole, authenticatedRole],
+      withCheck: sql`${t.userId} is null or (select auth.uid())::text = ${t.userId}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* source_videos — raw per-video provenance (CLI-internal, anon has no access) */
 /* ------------------------------------------------------------------ */
 
@@ -450,3 +499,6 @@ export type NewSourceVideo = typeof sourceVideos.$inferInsert;
 
 export type Visit = typeof visits.$inferSelect;
 export type NewVisit = typeof visits.$inferInsert;
+
+export type Feedback = typeof feedback.$inferSelect;
+export type NewFeedback = typeof feedback.$inferInsert;

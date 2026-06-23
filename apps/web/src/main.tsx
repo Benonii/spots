@@ -10,6 +10,7 @@ import {
 import { App } from "./App";
 import { NearMe } from "./NearMe";
 import { WhatsNewButton } from "./components/WhatsNewButton";
+import { FeedbackLauncher } from "./components/FeedbackLauncher";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
@@ -44,5 +45,6 @@ createRoot(el).render(
   <StrictMode>
     <RouterProvider router={router} />
     <WhatsNewButton />
+    <FeedbackLauncher />
   </StrictMode>,
 );
