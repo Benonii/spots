@@ -38,18 +38,17 @@ export function formatDistance(km: number): string {
 /**
  * Estimate road distance from straight-line distance: road ≈ A · km^B.
  *
- * Calibrated against Google driving distances from two real Addis origins (Ayat
- * + Kaliti, 11 spots). Circuity *decreases* with distance — short hops are
- * dominated by local detours (~1.8–2.0×) while long trips get onto arterials
- * that run more directly (~1.3–1.4×) — so a power curve with exponent < 1 fits
- * better than any constant (MAPE 10.5% vs 12.3%, worst case 19% vs 23%). Still
- * an estimate, not routing: per-destination direction/connectivity variance
- * (two spots the same distance out measured 1.35× and 1.91×) is irreducible
- * without real routing — that's what the Map button is for. Retune A/B with
- * more origin spot-checks.
+ * Calibrated against Google driving distances from a real Addis origin (Ayat,
+ * 8 spots spanning 2.6–10 km). Circuity *decreases* with distance — short hops
+ * are dominated by local detours (~1.6–2.0×) while long trips get onto arterials
+ * that run more directly (~1.25×) — so a power curve with exponent < 1 fits
+ * better than any constant (MAPE 10.8% vs 12.5%). Still an estimate, not routing:
+ * per-destination direction variance (two spots both 2.6 km out measured 1.96×
+ * and 1.61×) is irreducible without real routing — that's what the Map button is
+ * for. A/B lean toward the test origin; retune with more origin spot-checks.
  */
-const ROAD_A = 1.95;
-const ROAD_B = 0.87;
+const ROAD_A = 2.28;
+const ROAD_B = 0.73;
 export function estimateRoadKm(straightKm: number): number {
   return ROAD_A * Math.pow(Math.max(0, straightKm), ROAD_B);
 }
