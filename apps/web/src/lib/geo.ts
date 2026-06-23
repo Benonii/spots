@@ -58,6 +58,15 @@ export function estimateRoadKm(straightKm: number): number {
   return ROAD_A * Math.pow(Math.max(0, straightKm), ROAD_B);
 }
 
+/**
+ * Display a road estimate rounded to the nearest 0.5 km (→ a whole number or a
+ * .5). Coarse on purpose: it reads as the estimate it is, and absorbs the small
+ * misses an exact figure would expose. Floored at 0.5 so it never shows "0 km".
+ */
+export function formatRoadEstimate(km: number): string {
+  return `${Math.max(0.5, Math.round(km * 2) / 2)} km`;
+}
+
 export function isNearAddis(c: Coords): boolean {
   return haversineKm(c, ADDIS) <= ADDIS_RADIUS_KM;
 }

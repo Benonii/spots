@@ -4,7 +4,7 @@ import type { Spot } from "./lib/types";
 import { fetchSpots } from "./lib/supabase";
 import { PRICE_LABELS, coverImage, mapsUrl } from "./lib/format";
 import { openTikTok } from "./lib/tiktok";
-import { estimateRoadKm, formatDistance, haversineKm, useGeolocation } from "./lib/geo";
+import { estimateRoadKm, formatDistance, formatRoadEstimate, haversineKm, useGeolocation } from "./lib/geo";
 import { BrandMark } from "./components/BrandMark";
 
 // "Near me" caps at 10 km: past a few km it isn't really nearby, and the
@@ -59,7 +59,7 @@ function NearItem({ spot, roadKm }: Ranked) {
       </div>
       {/* estimated road distance (~) — see estimateRoadKm; not real routing */}
       <span className="near-dist" title="Estimated travel distance">
-        ~{formatDistance(roadKm)}
+        ~{formatRoadEstimate(roadKm)}
       </span>
       <span className="near-actions">
         <a
