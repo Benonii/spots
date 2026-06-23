@@ -58,7 +58,7 @@ body {
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .brand { display: flex; align-items: center; gap: 16px; }
 .brand-mark {
-  width: 46px; height: 46px; flex: none; display: block;
+  width: 44px; height: 44px; flex: none; display: block;
   filter: drop-shadow(0 2px 3px rgba(44, 66, 50, 0.18));
 }
 .brand-text h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; letter-spacing: 0.2px; color: var(--ink); }
@@ -78,6 +78,15 @@ body {
 }
 .auth-btn:hover { border-color: var(--sage); background: var(--surface-2); transform: translateY(-1px); }
 .auth-btn svg { flex: none; }
+.whatsnew-btn {
+  position: fixed; top: 14px; right: 14px; z-index: 50;
+  display: inline-flex; align-items: center; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.7812rem; color: var(--ink);
+  background: transparent; border: 1px dashed var(--line); border-radius: 10px;
+  padding: 7px 13px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.whatsnew-btn:hover { border-color: var(--sage); background: var(--press); transform: translateY(-1px); }
 .auth-user { display: flex; align-items: center; gap: 9px; }
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
 .auth-avatar-fallback {
@@ -635,4 +644,43 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .vt-remove { width: 40px; height: 40px; top: 6px; right: 6px; }
   .edit-star { padding: 5px; }
   .auth-signout { padding: 8px 4px; }
+}
+
+/* ---------- Shiplog changelog panel ----------
+   The widget injects its own .sl-* styles into <head> at runtime; we re-skin its
+   light theme to match the app. `body`-prefixed selectors out-specify the widget's
+   single-class defaults regardless of stylesheet injection order. (Its own dark
+   theme — toggled inside the panel — wins via higher specificity and is left as-is.) */
+body .sl-overlay { background: rgba(44, 66, 50, 0.28); }
+body .sl-panel {
+  width: 360px; background: var(--card); color: var(--ink);
+  font-family: var(--serif-b); border-left: 1px solid var(--line);
+  box-shadow: -6px 0 30px rgba(44, 66, 50, 0.16);
+}
+body .sl-header { padding: 18px 20px; border-bottom-color: var(--line) !important; }
+body .sl-header-title {
+  font-family: var(--serif-d); font-weight: 600; font-size: 1.0625rem; color: var(--ink);
+}
+body .sl-theme, body .sl-close { color: var(--muted); border-radius: 10px; }
+body .sl-theme:hover, body .sl-close:hover { background: var(--press); color: var(--ink); }
+body .sl-list { padding: 14px 20px 20px; }
+body .sl-empty { color: var(--muted); font-family: var(--serif-b); }
+body .sl-entry { border-bottom-color: var(--line-soft); padding: 16px 0; }
+body .sl-entry-icon { color: var(--sage); }
+body .sl-entry-date { color: var(--muted); }
+body .sl-entry-title {
+  font-family: var(--serif-d); font-weight: 600; font-size: 0.9375rem; color: var(--ink);
+}
+body .sl-entry-desc { color: var(--ink-soft); font-size: 0.8438rem; }
+body .sl-tag { font-family: var(--serif-b); font-weight: 600; }
+body .sl-tag-feature { background: rgba(126, 149, 121, 0.18); color: var(--green-deep); }
+body .sl-tag-fix { background: rgba(62, 92, 68, 0.14); color: var(--green); }
+body .sl-tag-improvement { background: var(--accent-wash); color: var(--accent-text); }
+body .sl-tag-breaking { background: rgba(227, 123, 51, 0.16); color: var(--accent-text); }
+body .sl-footer { border-top-color: var(--line) !important; }
+body .sl-footer a { color: var(--muted); }
+body .sl-footer a:hover { color: var(--ink-soft); }
+
+@media (max-width: 640px) {
+  body .sl-panel { width: 100vw; border-left: none; }
 }
