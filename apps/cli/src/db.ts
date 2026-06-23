@@ -3,7 +3,7 @@
  * by the frontend). Bypasses RLS; performs all writes. See docs/schemas.md §0.
  *
  * Lazily connected: the postgres-js client is built on first DB access, not at
- * import, so `df --help` and pure commands run without DATABASE_URL.
+ * import, so `spots --help` and pure commands run without DATABASE_URL.
  */
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

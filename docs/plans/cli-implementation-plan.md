@@ -137,7 +137,7 @@ this is the same idea, relocated so two consumers can share it cleanly.
    so the `pgPolicy`/`enableRLS` declarations emit into the migration.
 3. `bunx drizzle-kit generate` → review the SQL (confirm the three tables, the indexes from
    `schemas.md` §2, and the RLS block from §7 all appear) → `bunx drizzle-kit migrate`.
-4. Wire `df migrate` / `df db:push` as CLI passthroughs so day-to-day runs don't need raw drizzle-kit.
+4. Wire `spots migrate` / `spots db:push` as CLI passthroughs so day-to-day runs don't need raw drizzle-kit.
 5. **Verify the RLS boundary** right after migrating: with the anon key, `select` on `spots`
    succeeds and on `channels`/`source_videos` is denied. This is the one security-critical
    invariant of the whole system (`architecture.md` §7) — check it explicitly, don't assume.
@@ -150,17 +150,17 @@ Staged commands (for cost control + debugging) plus one orchestrator. Each stage
 function of DB state, gated by a column so re-runs are safe.
 
 ```
-df channels add <url> [--handle @x] [--name "…"]   # seed/enable a channel
-df channels list | deactivate <handle>
+spots channels add <url> [--handle @x] [--name "…"]   # seed/enable a channel
+spots channels list | deactivate <handle>
 
-df scrape   [--channel @x] [--limit N]   # stages 1–2: enumerate + per-video metadata → source_videos
-df comments [--limit N] [--min-views N]  # stage 3: ScrapFly top comments  (the metered step)
-df normalize [--limit N] [--all]         # stage 4: LLM → source_videos.extraction (+ normalized_at)
-df geocode  [--limit N]                  # stage 5: Places → source_videos.geo (place_id cache)
-df upsert                                # stage 6: aggregate extractions → spots, link source_videos
-df ingest   [--channel @x]               # run 1→6 end-to-end with sensible defaults
+spots scrape   [--channel @x] [--limit N]   # stages 1–2: enumerate + per-video metadata → source_videos
+spots comments [--limit N] [--min-views N]  # stage 3: ScrapFly top comments  (the metered step)
+spots normalize [--limit N] [--all]         # stage 4: LLM → source_videos.extraction (+ normalized_at)
+spots geocode  [--limit N]                  # stage 5: Places → source_videos.geo (place_id cache)
+spots upsert                                # stage 6: aggregate extractions → spots, link source_videos
+spots ingest   [--channel @x]               # run 1→6 end-to-end with sensible defaults
 
-df migrate | db:push                     # drizzle passthroughs
+spots migrate | db:push                     # drizzle passthroughs
 ```
 
 Re-run gates (the idempotency contract):
@@ -267,7 +267,7 @@ revisit against real Addis data (`architecture.md` §11.3).
    `.env.example`. Create `packages/db` and `apps/cli` packages.
 2. **DB layer** — relocate `schema.ts` (+D1 columns if approved), `drizzle.config.ts`,
    `generate` → review → `migrate`. **Verify RLS** (§4.5). *Gate: migrations apply, RLS holds.*
-3. **CLI skeleton** — `citty` command tree, `env.ts`, `db.ts`, `consola`. `df channels add/list`
+3. **CLI skeleton** — `citty` command tree, `env.ts`, `db.ts`, `consola`. `spots channels add/list`
    working against the DB. *Gate: can seed a channel.*
 4. **`scrape`** — yt-dlp enumerate + metadata → `source_videos`. *Gate: real rows for one channel.*
 5. **`comments`** — ScrapFly top comments. *Gate: `top_comments` populated for scoped videos.*

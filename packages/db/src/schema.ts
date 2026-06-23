@@ -405,7 +405,7 @@ export const feedback = pgTable(
 /**
  * A lightweight append-only event stream for product analytics — page views and
  * feature usage — so we can compute DAU/MAU and "most-used features" with plain
- * SQL (see packages/db/analytics.sql, or `df analytics`).
+ * SQL (see packages/db/analytics.sql, or `spots analytics`).
  *
  * Every actor is identified by `coalesce(user_id, anon_id)`: signed-in users get
  * their stable `auth.uid()` (stamped server-side); everyone else carries a

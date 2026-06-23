@@ -1,5 +1,5 @@
 /**
- * `df analytics` — headline product metrics from the `events` table, read over
+ * `spots analytics` — headline product metrics from the `events` table, read over
  * the RLS-bypassing CLI connection. For ad-hoc digging see packages/db/analytics.sql.
  */
 import { defineCommand } from "citty";

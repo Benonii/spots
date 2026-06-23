@@ -41,7 +41,7 @@ const list = defineCommand({
   async run() {
     const rows = await db.select().from(schema.channels);
     if (!rows.length) {
-      consola.info("No channels yet. Add one: df channels add <url>");
+      consola.info("No channels yet. Add one: spots channels add <url>");
       return;
     }
     for (const c of rows) {
