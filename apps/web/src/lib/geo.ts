@@ -41,18 +41,19 @@ export function formatDistance(km: number): string {
  * Calibrated against Google driving distances from a real Addis origin (Ayat,
  * 8 spots spanning 2.6–10 km). Circuity *decreases* with distance — short hops
  * are dominated by local detours (~1.6–2.0×) while long trips get onto arterials
- * that run more directly (~1.25×) — so a power curve with exponent < 1 fits
- * better than any constant (MAPE 10.8% vs 12.5%). Still an estimate, not routing:
- * per-destination direction variance (two spots both 2.6 km out measured 1.96×
- * and 1.61×) is irreducible without real routing — that's what the Map button is
- * for. A/B lean toward the test origin; retune with more origin spot-checks.
+ * that run more directly (~1.25×) — so a power curve with exponent < 1 fits.
+ * A/B are tuned to minimize the *worst* per-spot error (~0.86 km) rather than
+ * the average, since accuracy here is a worst-case goal. Still an estimate, not
+ * routing: per-destination direction variance (two spots both 2.6 km out
+ * measured 1.96× and 1.61×) is irreducible — that's what the Map button is for.
+ * A/B lean toward the test origin; retune with more origin spot-checks.
  *
  * Only trustworthy within ~10 km (the /near page caps there). Because B < 1 the
  * implied ratio keeps falling and under-shoots well past that range — fine,
  * since those spots aren't "near" and aren't shown.
  */
-const ROAD_A = 2.28;
-const ROAD_B = 0.73;
+const ROAD_A = 2.51;
+const ROAD_B = 0.68;
 export function estimateRoadKm(straightKm: number): number {
   return ROAD_A * Math.pow(Math.max(0, straightKm), ROAD_B);
 }
