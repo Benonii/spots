@@ -738,7 +738,8 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 
 /* the modal — shared by both triggers */
 .fb-scrim {
-  position: fixed; inset: 0; z-index: 120; padding: 20px;
+  /* above Leaflet (its panes ~400-700 and zoom controls at z-index 1000) */
+  position: fixed; inset: 0; z-index: 2000; padding: 20px;
   display: flex; align-items: center; justify-content: center;
   background: rgba(28, 36, 30, 0.46); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
   animation: fb-fade 0.16s ease;
