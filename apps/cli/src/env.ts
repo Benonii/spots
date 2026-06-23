@@ -2,7 +2,7 @@
  * Env loading + validation. Bun auto-loads `.env` from the repo root.
  *
  * DATABASE_URL is required for anything that touches the DB. The per-stage API
- * keys are validated lazily by `requireKeys()` so `df --help` and pure commands
+ * keys are validated lazily by `requireKeys()` so `spots --help` and pure commands
  * don't fail when a key they don't use is absent.
  */
 import { z } from "zod";
@@ -10,7 +10,7 @@ import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 
 // Load the repo-root .env regardless of the process's cwd. Bun only auto-loads
-// .env from the current directory, so `bun run df` launched from a subpackage
+// .env from the current directory, so `bun run spots` launched from a subpackage
 // (e.g. apps/cli) would otherwise miss it. Does not override vars already set.
 config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 

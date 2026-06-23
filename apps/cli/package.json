@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "df": "./src/index.ts"
+    "spots": "./src/index.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.82",
@@ -21,7 +21,7 @@
     "zod": "^4.4.3"
   },
   "scripts": {
-    "df": "bun src/index.ts",
+    "spots": "bun src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * date-finder ingestion CLI (`df`). Command surface per
+ * date-finder ingestion CLI (`spots`). Command surface per
  * docs/plans/cli-implementation-plan.md §5.
  */
 import { defineCommand, runMain } from "citty";
@@ -26,7 +26,7 @@ import {
 
 const main = defineCommand({
   meta: {
-    name: "df",
+    name: "spots",
     description: "date-finder — TikTok review ingestion pipeline",
   },
   subCommands: {

@@ -69,7 +69,7 @@ export const scrapeCommand = defineCommand({
       consola.warn(
         args.channel
           ? `No channel ${args.channel}.`
-          : "No active channels. Add one: df channels add <url>",
+          : "No active channels. Add one: spots channels add <url>",
       );
       return;
     }
