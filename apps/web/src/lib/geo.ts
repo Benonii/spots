@@ -36,17 +36,22 @@ export function formatDistance(km: number): string {
 }
 
 /**
- * Estimate road distance from straight-line distance with a flat factor.
+ * Estimate road distance from straight-line distance: road ≈ A · km^B.
  *
- * Still an estimate, not routing: circuity varies by where you start (sweeps put
- * well-connected/main-road origins near ~1.3–1.4× and constrained/residential
- * ones — like the calibration pin — near ~1.74×). No single constant is right
- * everywhere, so 1.6 is a city-wide compromise chosen to lean toward overshoot
- * (preferred over undershoot). Expect ~±15–20% per spot. Retune if needed.
+ * Calibrated against Google driving distances from two real Addis origins (Ayat
+ * + Kaliti, 11 spots). Circuity *decreases* with distance — short hops are
+ * dominated by local detours (~1.8–2.0×) while long trips get onto arterials
+ * that run more directly (~1.3–1.4×) — so a power curve with exponent < 1 fits
+ * better than any constant (MAPE 10.5% vs 12.3%, worst case 19% vs 23%). Still
+ * an estimate, not routing: per-destination direction/connectivity variance
+ * (two spots the same distance out measured 1.35× and 1.91×) is irreducible
+ * without real routing — that's what the Map button is for. Retune A/B with
+ * more origin spot-checks.
  */
-const ROAD_FACTOR = 1.6;
+const ROAD_A = 1.95;
+const ROAD_B = 0.87;
 export function estimateRoadKm(straightKm: number): number {
-  return Math.max(0, straightKm) * ROAD_FACTOR;
+  return ROAD_A * Math.pow(Math.max(0, straightKm), ROAD_B);
 }
 
 export function isNearAddis(c: Coords): boolean {
