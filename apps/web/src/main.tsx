@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { App } from "./App";
 import { NearMe } from "./NearMe";
+import { WhatsNewButton } from "./components/WhatsNewButton";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
@@ -42,5 +43,6 @@ if (!el) throw new Error("#root element not found");
 createRoot(el).render(
   <StrictMode>
     <RouterProvider router={router} />
+    <WhatsNewButton />
   </StrictMode>,
 );
