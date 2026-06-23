@@ -7,11 +7,14 @@ import { openTikTok } from "./lib/tiktok";
 import { estimateRoadKm, formatDistance, haversineKm, useGeolocation } from "./lib/geo";
 import { BrandMark } from "./components/BrandMark";
 
+// "Near me" caps at 10 km: past a few km it isn't really nearby, and the
+// distance estimate is only calibrated/reliable within this range anyway.
+const MAX_RADIUS = 10;
 const RADII = [
   { value: 1, label: "1 km" },
   { value: 3, label: "3 km" },
   { value: 5, label: "5 km" },
-  { value: Infinity, label: "Any" },
+  { value: MAX_RADIUS, label: "10 km" },
 ];
 
 function BackIcon() {
@@ -90,7 +93,7 @@ function NearItem({ spot, roadKm }: Ranked) {
 export function NearMe() {
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [radius, setRadius] = useState(3);
+  const [radius, setRadius] = useState(5);
   const geo = useGeolocation();
 
   // Ask for location and load the catalog as soon as the page opens.
@@ -216,8 +219,8 @@ export function NearMe() {
         ) : (
           <div className="near-state">
             <p>
-              Nothing within {RADII.find((r) => r.value === radius)?.label.toLowerCase()}.
-              Try a wider distance.
+              No spots within {RADII.find((r) => r.value === radius)?.label.toLowerCase()} of you.
+              {radius < MAX_RADIUS ? " Try a wider distance." : ""}
             </p>
           </div>
         )}

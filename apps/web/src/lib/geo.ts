@@ -46,6 +46,10 @@ export function formatDistance(km: number): string {
  * per-destination direction variance (two spots both 2.6 km out measured 1.96×
  * and 1.61×) is irreducible without real routing — that's what the Map button is
  * for. A/B lean toward the test origin; retune with more origin spot-checks.
+ *
+ * Only trustworthy within ~10 km (the /near page caps there). Because B < 1 the
+ * implied ratio keeps falling and under-shoots well past that range — fine,
+ * since those spots aren't "near" and aren't shown.
  */
 const ROAD_A = 2.28;
 const ROAD_B = 0.73;
