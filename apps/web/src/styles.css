@@ -478,13 +478,8 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .appstate-btn:active { transform: translateY(1px); }
 
 @media (max-width: 900px) {
-  /* header spans full width here, so float the trigger out of the top-right corner
-     and pin it bottom-right over the content (solid + shadowed so it stays legible) */
-  .whatsnew-btn {
-    top: auto; bottom: 16px; right: 16px; z-index: 60;
-    background: var(--card); border-style: solid;
-    box-shadow: 0 4px 16px rgba(44, 66, 50, 0.18);
-  }
+  /* the bottom-right FAB carries "What's New" here, so hide the standalone one */
+  .whatsnew-btn { display: none; }
 
   /* filter bar on top; the panel drops over the spot card as a glassy overlay */
   .app { display: flex; flex-direction: column; padding: 18px 16px 60px; }
@@ -691,4 +686,146 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 
 @media (max-width: 640px) {
   body .sl-panel { width: 100vw; border-left: none; }
+}
+
+/* ====================================================================== */
+/* feedback launcher (desktop button + mobile FAB) and the feedback modal */
+/* ====================================================================== */
+
+/* large screens: a solid bottom-right "Feedback" pill (the primary affordance);
+   the mobile FAB is hidden here. Roles swap at <=900px below. */
+.feedback-btn {
+  position: fixed; bottom: 22px; right: 22px; z-index: 55;
+  display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.875rem; font-weight: 600; color: #fff;
+  background: var(--primary); border: 1px solid var(--green-deep); border-radius: 999px;
+  padding: 11px 18px; box-shadow: 0 6px 20px rgba(44, 66, 50, 0.22);
+  transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.feedback-btn:hover { background: var(--green-deep); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(44, 66, 50, 0.28); }
+.feedback-btn:active { transform: translateY(0); }
+.feedback-btn svg { flex: none; }
+
+/* mobile FAB + popup menu — hidden on desktop, shown at <=900px */
+.fab-wrap { display: none; }
+.fab {
+  width: 52px; height: 52px; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff;
+  background: var(--primary); border: 1px solid var(--green-deep);
+  box-shadow: 0 6px 20px rgba(44, 66, 50, 0.26);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.fab:active { transform: scale(0.94); }
+.fab-wrap.open .fab { background: var(--green-deep); }
+.fab-menu {
+  position: absolute; right: 0; bottom: calc(100% + 10px); min-width: 188px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px;
+  box-shadow: 0 12px 32px rgba(44, 66, 50, 0.22);
+  transform-origin: bottom right;
+  opacity: 0; visibility: hidden; transform: translateY(6px) scale(0.97); pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.fab-wrap.open .fab-menu { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+.fab-item {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.9062rem; font-weight: 600; color: var(--ink);
+  background: transparent; border: none; border-radius: 9px; padding: 11px 12px;
+  transition: background 0.12s ease;
+}
+.fab-item:hover { background: var(--press); }
+.fab-item svg { flex: none; color: var(--green); }
+
+/* the modal — shared by both triggers */
+.fb-scrim {
+  position: fixed; inset: 0; z-index: 120; padding: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(28, 36, 30, 0.46); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: fb-fade 0.16s ease;
+}
+@keyframes fb-fade { from { opacity: 0; } to { opacity: 1; } }
+.fb-dialog {
+  position: relative; width: 100%; max-width: 460px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 26px 26px 22px; box-shadow: 0 24px 60px rgba(28, 36, 30, 0.3);
+  animation: fb-pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes fb-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+.fb-close {
+  position: absolute; top: 14px; right: 14px; display: inline-flex; padding: 6px;
+  border-radius: 8px; cursor: pointer; color: var(--muted); background: transparent; border: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.fb-close:hover { background: var(--press); color: var(--ink); }
+
+.fb-head h2 { font-family: var(--serif-d); font-weight: 600; font-size: 1.3125rem; color: var(--ink); margin: 0 0 5px; }
+.fb-head p { margin: 0 0 18px; font-size: 0.875rem; color: var(--muted); max-width: 42ch; }
+
+.fb-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fb-kind {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 6px;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.fb-kind svg { color: var(--muted); transition: color 0.15s ease; }
+.fb-kind:hover { border-color: var(--sage); color: var(--ink); }
+.fb-kind.on { background: var(--accent-wash); border-color: var(--accent-line); color: var(--accent-text); }
+.fb-kind.on svg { color: var(--accent-text); }
+.fb-kind-hint { margin: 9px 0 14px; font-size: 0.8125rem; color: var(--muted); min-height: 1.1em; }
+
+.fb-field { display: block; margin-bottom: 14px; }
+.fb-label { display: block; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.fb-optional { text-transform: none; letter-spacing: 0; font-weight: 400; font-style: italic; }
+.fb-textarea, .fb-input {
+  width: 100%; font-family: var(--serif-b); font-size: 0.9062rem; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.fb-textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+.fb-textarea::placeholder, .fb-input::placeholder { color: var(--muted); font-style: italic; }
+.fb-textarea:focus, .fb-input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus-ring); }
+.fb-count { display: block; text-align: right; margin-top: 5px; font-size: 0.6875rem; color: var(--muted); }
+
+.fb-error { margin: 0 0 12px; font-size: 0.8125rem; color: #b3402e; }
+.fb-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.fb-cancel {
+  font-family: var(--serif-b); font-size: 0.875rem; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+  background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 10px 18px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.fb-cancel:hover { border-color: var(--sage); color: var(--ink); }
+.fb-submit {
+  font-family: var(--serif-b); font-size: 0.875rem; font-weight: 600; color: #fff; cursor: pointer;
+  background: var(--primary); border: 1px solid var(--green-deep); border-radius: 999px; padding: 10px 20px;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.fb-submit:hover:not(:disabled) { background: var(--green-deep); transform: translateY(-1px); }
+.fb-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.fb-done { text-align: center; padding: 24px 10px 16px; }
+.fb-done-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 50%; margin-bottom: 14px;
+  color: var(--primary); background: color-mix(in oklab, var(--primary) 12%, transparent);
+  animation: fb-pop 0.25s ease;
+}
+.fb-done h2 { font-family: var(--serif-d); font-weight: 600; font-size: 1.25rem; color: var(--ink); margin: 0 0 6px; }
+.fb-done p { margin: 0; font-size: 0.9062rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  /* roles swap: hide the desktop pill, show the FAB cluster bottom-right */
+  .feedback-btn { display: none; }
+  .fab-wrap { display: block; position: fixed; bottom: 18px; right: 16px; z-index: 60; }
+}
+
+@media (max-width: 560px) {
+  /* phones: the modal becomes a bottom sheet — easier reach, full width */
+  .fb-scrim { padding: 0; align-items: flex-end; }
+  .fb-dialog {
+    max-width: none; border-radius: 18px 18px 0 0;
+    padding: 22px 18px calc(20px + env(safe-area-inset-bottom));
+    animation: fb-sheet 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes fb-sheet { from { transform: translateY(100%); } to { transform: none; } }
 }
