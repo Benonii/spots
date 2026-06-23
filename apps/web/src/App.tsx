@@ -114,7 +114,14 @@ export function App() {
       return true;
     }
   });
-  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  // a `?spot=<place_id>` param (e.g. from the /near page) deep-links to one spot
+  const [pendingTarget, setPendingTarget] = useState<string | null>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("spot");
+    } catch {
+      return null;
+    }
+  });
   const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -185,7 +192,12 @@ export function App() {
   useEffect(() => {
     if (pickedRandom.current || !spots || !spots.length) return;
     pickedRandom.current = true;
+    // honor a deep-linked spot instead of a random one — the landing effect below
+    // will jump to it once the catalog is in the filtered list
+    if (pendingTarget) return;
     setIndex(Math.floor(Math.random() * spots.length));
+    // pendingTarget is only read on the first run; intentionally not a dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots]);
 
   const spotsById = useMemo(
@@ -235,6 +247,10 @@ export function App() {
     if (idx >= 0) {
       setIndex(idx);
       setPendingTarget(null);
+      // drop the `?spot=` param so a refresh doesn't re-jump (no-op for in-app jumps)
+      if (window.location.search) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [pendingTarget, filtered]);

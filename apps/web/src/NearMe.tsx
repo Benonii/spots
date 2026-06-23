@@ -49,7 +49,13 @@ type Ranked = { spot: Spot; km: number; roadKm: number };
 function NearItem({ spot, roadKm }: Ranked) {
   return (
     <li className="near-item">
-      <span className="near-cover" style={{ backgroundImage: coverImage(spot) }} aria-hidden="true" />
+      <Link
+        to="/"
+        search={{ spot: spot.google_place_id }}
+        className="near-cover"
+        style={{ backgroundImage: coverImage(spot) }}
+        aria-label={`Open ${spot.name}`}
+      />
       <div className="near-main">
         <span className="near-name">{spot.name}</span>
         <span className="near-meta">

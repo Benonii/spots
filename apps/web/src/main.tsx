@@ -16,6 +16,10 @@ const rootRoute = createRootRoute({ component: () => <Outlet /> });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  // `?spot=<place_id>` deep-links the carousel to a specific spot (used by /near)
+  validateSearch: (search): { spot?: string } => ({
+    spot: typeof search.spot === "string" ? search.spot : undefined,
+  }),
   component: App,
 });
 const nearRoute = createRoute({
