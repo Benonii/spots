@@ -78,6 +78,63 @@ body {
 }
 .auth-btn:hover { border-color: var(--sage); background: var(--surface-2); transform: translateY(-1px); }
 .auth-btn svg { flex: none; }
+
+/* topbar link into the dedicated "Near me" page — framed with rounded corner
+   brackets. A ::before overlay draws a full rounded border, then a mask hides
+   everything except a small square at each corner, so only the rounded elbows
+   (plus a short arm) remain. --len controls how far the arms reach, --rad how
+   round the elbow is. */
+.near-link {
+  --frame: var(--line);   /* bracket colour */
+  --len: 12px;            /* corner reach (arm length incl. the curve) */
+  --th: 1.6px;            /* line thickness */
+  --rad: 7px;             /* elbow roundness */
+  position: relative;
+  display: inline-flex; align-items: center; gap: 9px; flex: none; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.8438rem; color: var(--ink);
+  text-decoration: none; background: transparent;
+  /* no border (brackets stand in), so +1px padding to match the bordered
+     sign-in pill's outer height */
+  border: 0; padding: 9px 16px;
+  transition: color 0.15s ease, transform 0.12s ease;
+}
+.near-link::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: var(--th) solid var(--frame); border-radius: var(--rad);
+  /* one mask square per corner; the rest of the border is masked away */
+  --sq: linear-gradient(#000 0 0);
+  -webkit-mask: var(--sq) 0 0, var(--sq) 100% 0, var(--sq) 0 100%, var(--sq) 100% 100%;
+          mask: var(--sq) 0 0, var(--sq) 100% 0, var(--sq) 0 100%, var(--sq) 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: var(--len) var(--len); mask-size: var(--len) var(--len);
+  transition: border-color 0.15s ease;
+}
+.near-link:hover { --frame: var(--accent-text); color: var(--accent-text); transform: translateY(-1px); }
+.near-link svg { flex: none; }
+.near-link-label { white-space: nowrap; }
+
+/* tooltip (Radix primitive): light + as transparent as legibility allows, and
+   only shown on mobile where the topbar buttons collapse to bare icons. */
+.tooltip {
+  background: color-mix(in oklab, var(--bg) 42%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  border: 1px solid color-mix(in oklab, var(--ink) 12%, transparent);
+  font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600;
+  padding: 5px 9px; border-radius: 8px; line-height: 1.2;
+  user-select: none; z-index: 100;
+  animation: tooltip-in 0.12s ease;
+}
+.tooltip-arrow { fill: color-mix(in oklab, var(--bg) 42%, transparent); }
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+/* desktop shows the button labels, so the tooltip would be redundant */
+@media (min-width: 561px) {
+  .tooltip { display: none; }
+}
 .whatsnew-btn {
   position: fixed; top: 14px; right: 14px; z-index: 50;
   display: inline-flex; align-items: center; cursor: pointer;
@@ -476,6 +533,86 @@ a.spot-cover:hover { filter: brightness(1.06); }
 }
 .appstate-btn:hover { background: color-mix(in oklab, var(--accent) 88%, #000); }
 .appstate-btn:active { transform: translateY(1px); }
+
+/* ---------- "Near me" page ---------- */
+.near-page { max-width: 880px; }
+.near-top { margin-bottom: 26px; }
+.near-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8125rem; color: var(--ink-soft); text-decoration: none;
+  margin-bottom: 18px; transition: color 0.15s ease;
+}
+.near-back:hover { color: var(--accent-text); }
+.near-back svg { flex: none; }
+.near-title { display: flex; align-items: center; gap: 16px; }
+.near-title h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; color: var(--ink); }
+.near-title p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); font-style: italic; }
+
+.near-controls { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 18px; }
+.near-radius {
+  font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 16px; cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.near-radius:hover { border-color: var(--accent-line); color: var(--accent-text); }
+.near-radius.on { background: var(--green); border-color: var(--green); color: #fff; }
+
+.near-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.near-item {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px;
+}
+.near-cover {
+  width: 52px; height: 52px; flex: none; border-radius: 11px;
+  background-size: cover; background-position: center; background-color: var(--line-soft);
+  display: block; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.near-cover:hover { transform: scale(1.04); box-shadow: 0 2px 10px rgb(0 0 0 / 0.14); }
+.near-cover:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.near-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+.near-name { font-family: var(--serif-d); font-weight: 600; font-size: 1rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.near-meta { font-size: 0.8125rem; color: var(--muted); }
+.near-dist {
+  flex: none; font-size: 0.8125rem; font-weight: 700; color: var(--accent-text);
+  background: var(--accent-wash); border-radius: 999px; padding: 4px 11px;
+}
+.near-actions { display: flex; gap: 8px; flex: none; }
+
+.near-state { text-align: center; padding: 80px 20px; color: var(--ink-soft); }
+.near-state h2 { font-family: var(--serif-d); font-weight: 500; color: var(--ink); margin: 0 0 8px; }
+.near-state p { margin: 0 auto 18px; max-width: 40ch; font-size: 0.9375rem; color: var(--muted); }
+.near-state .appstate-btn { text-decoration: none; display: inline-block; }
+.near-spinner {
+  display: inline-block; width: 30px; height: 30px; margin-bottom: 16px;
+  border: 3px solid var(--line); border-top-color: var(--green); border-radius: 50%;
+  animation: near-spin 0.7s linear infinite;
+}
+@keyframes near-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  /* near list: Map/Watch become icon-only buttons in a row, and type shrinks a
+     step so names get room to breathe instead of truncating */
+  .near-item { gap: 11px; padding: 10px 12px; }
+  .near-cover { width: 46px; height: 46px; }
+  .near-name { font-size: 0.9375rem; }
+  .near-meta { font-size: 0.75rem; }
+  .near-dist { font-size: 0.75rem; padding: 3px 9px; }
+  .near-actions { gap: 6px; }
+  .near-actions .abtn-label { display: none; }
+  .near-actions .action-btn { padding: 8px; border-radius: 11px; gap: 0; }
+
+  /* header: let the title/subtitle column shrink so the subtitle wraps */
+  .near-title > div { min-width: 0; }
+  .near-title h1 { font-size: 1.375rem; }
+  .near-title p { font-size: 0.8125rem; }
+
+  /* topbar gets tight next to the brand: drop both "Near me" and "Sign in" to
+     equally-sized icon buttons, their tooltips carry the labels */
+  .near-link-label, .auth-btn-label { display: none; }
+  .near-link { padding: 9px; gap: 0; --len: 9px; }
+  .auth-btn { padding: 8px; gap: 0; }
+}
 
 @media (max-width: 900px) {
   /* header spans full width here, so float the trigger out of the top-right corner

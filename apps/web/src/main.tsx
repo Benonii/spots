@@ -8,18 +8,29 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { App } from "./App";
+import { NearMe } from "./NearMe";
 import { WhatsNewButton } from "./components/WhatsNewButton";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
-// Single-page for v0; the router is set up so spot-detail routes can be added later.
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  // `?spot=<place_id>` deep-links the carousel to a specific spot (used by /near)
+  validateSearch: (search): { spot?: string } => ({
+    spot: typeof search.spot === "string" ? search.spot : undefined,
+  }),
   component: App,
 });
-const router = createRouter({ routeTree: rootRoute.addChildren([indexRoute]) });
+const nearRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/near",
+  component: NearMe,
+});
+const router = createRouter({
+  routeTree: rootRoute.addChildren([indexRoute, nearRoute]),
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

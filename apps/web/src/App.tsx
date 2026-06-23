@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
 import type { CommunityVisit, Spot, VisitedEntry, VisitPatch } from "./lib/types";
@@ -23,6 +24,7 @@ import { VisitedTable } from "./components/VisitedTable";
 import { CommunityTable } from "./components/CommunityTable";
 import { AuthButton } from "./components/AuthButton";
 import { BrandMark } from "./components/BrandMark";
+import { Tooltip } from "./components/Tooltip";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -55,6 +57,16 @@ function SearchIcon() {
       strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />
       <path d="M13 13l-2.7-2.7" />
+    </svg>
+  );
+}
+
+function NearIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z" />
+      <circle cx="12" cy="10.5" r="2.3" />
     </svg>
   );
 }
@@ -102,7 +114,14 @@ export function App() {
       return true;
     }
   });
-  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  // a `?spot=<place_id>` param (e.g. from the /near page) deep-links to one spot
+  const [pendingTarget, setPendingTarget] = useState<string | null>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("spot");
+    } catch {
+      return null;
+    }
+  });
   const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -173,7 +192,12 @@ export function App() {
   useEffect(() => {
     if (pickedRandom.current || !spots || !spots.length) return;
     pickedRandom.current = true;
+    // honor a deep-linked spot instead of a random one — the landing effect below
+    // will jump to it once the catalog is in the filtered list
+    if (pendingTarget) return;
     setIndex(Math.floor(Math.random() * spots.length));
+    // pendingTarget is only read on the first run; intentionally not a dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots]);
 
   const spotsById = useMemo(
@@ -223,6 +247,10 @@ export function App() {
     if (idx >= 0) {
       setIndex(idx);
       setPendingTarget(null);
+      // drop the `?spot=` param so a refresh doesn't re-jump (no-op for in-app jumps)
+      if (window.location.search) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [pendingTarget, filtered]);
@@ -509,6 +537,12 @@ export function App() {
           <div className="brand-count brand-count-desktop">
             {spots.length} places{user ? ` · ${visited.length} visited` : ""}
           </div>
+          <Tooltip label="Near me">
+            <Link to="/near" className="near-link" aria-label="Near me">
+              <NearIcon />
+              <span className="near-link-label">Near me</span>
+            </Link>
+          </Tooltip>
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>

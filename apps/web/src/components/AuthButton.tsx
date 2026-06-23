@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { Tooltip } from "./Tooltip";
 
 /** Google's multicolor "G" mark. */
 function GoogleG() {
@@ -24,10 +25,12 @@ export function AuthButton({
 }) {
   if (!user) {
     return (
-      <button className="auth-btn" onClick={onSignIn}>
-        <GoogleG />
-        Sign in
-      </button>
+      <Tooltip label="Sign in">
+        <button className="auth-btn" onClick={onSignIn} aria-label="Sign in with Google">
+          <GoogleG />
+          <span className="auth-btn-label">Sign in</span>
+        </button>
+      </Tooltip>
     );
   }
 
