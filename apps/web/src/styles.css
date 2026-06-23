@@ -478,6 +478,14 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .appstate-btn:active { transform: translateY(1px); }
 
 @media (max-width: 900px) {
+  /* header spans full width here, so float the trigger out of the top-right corner
+     and pin it bottom-right over the content (solid + shadowed so it stays legible) */
+  .whatsnew-btn {
+    top: auto; bottom: 16px; right: 16px; z-index: 60;
+    background: var(--card); border-style: solid;
+    box-shadow: 0 4px 16px rgba(44, 66, 50, 0.18);
+  }
+
   /* filter bar on top; the panel drops over the spot card as a glassy overlay */
   .app { display: flex; flex-direction: column; padding: 18px 16px 60px; }
   .topbar { order: 0; }
