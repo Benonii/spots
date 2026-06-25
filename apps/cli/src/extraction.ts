@@ -4,7 +4,7 @@
  * quality_signals; the CLI does the deterministic scoring (see scoring.ts).
  */
 import { z } from "zod";
-import type { Extraction } from "@date-finder/db";
+import type { Extraction } from "@spots/db";
 
 export const extractionSchema = z.object({
   venueName: z.string().nullable(), // null if no identifiable place named

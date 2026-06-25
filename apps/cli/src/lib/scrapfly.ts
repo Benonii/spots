@@ -10,7 +10,7 @@
  * with --limit / --min-views (the comments command does this).
  */
 import { ScrapflyClient, ScrapeConfig, ScrapeResult } from "scrapfly-sdk";
-import type { TopComment } from "@date-finder/db";
+import type { TopComment } from "@spots/db";
 import { getEnv } from "../env.ts";
 
 let client: ScrapflyClient | null = null;

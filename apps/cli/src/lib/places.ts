@@ -5,7 +5,7 @@
  * authoritative price comes from the LLM extraction.
  */
 import { getEnv } from "../env.ts";
-import type { GeoResult } from "@date-finder/db";
+import type { GeoResult } from "@spots/db";
 
 const ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
 const FIELD_MASK =

@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
 import { qualityScore, priceLevel } from "./scoring.ts";
-import type { QualitySignals } from "@date-finder/db";
+import type { QualitySignals } from "@spots/db";
 
 const signals: QualitySignals = {
   dimensions: { aesthetic: 4.5, vibe: 4.0, food: 3.5, value: 4.0, service: 3.0 },

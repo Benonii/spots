@@ -9,7 +9,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { eq, inArray } from "drizzle-orm";
-import type { NewSourceVideo } from "@date-finder/db";
+import type { NewSourceVideo } from "@spots/db";
 import { db, schema } from "../db.ts";
 import { enumerateChannel, fetchVideo, type RawVideo } from "../lib/ytdlp.ts";
 import { sleep, jitter } from "../lib/throttle.ts";

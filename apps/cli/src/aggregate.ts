@@ -11,7 +11,7 @@
  *   summary    → from the highest-engagement video
  *   neighborhood → from the highest-engagement video that named one
  */
-import type { Extraction, GeoResult, QualitySignals } from "@date-finder/db";
+import type { Extraction, GeoResult, QualitySignals } from "@spots/db";
 import { priceLevel, qualityScore, type PriceBasis } from "./scoring.ts";
 
 export type VideoForAgg = {

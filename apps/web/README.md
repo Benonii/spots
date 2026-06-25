@@ -1,4 +1,4 @@
-# @date-finder/web
+# @spots/web
 
 TanStack Router SPA — browse Addis date spots. Reads **only** the `spots` table via
 `@supabase/supabase-js` with the publishable (anon) key, enforced by RLS. Ported from the

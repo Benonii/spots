@@ -1,5 +1,5 @@
 /**
- * date-finder — database schema (source of truth)
+ * spots — database schema (source of truth)
  *
  * Defined in Drizzle. `drizzle-kit generate` turns this into SQL migrations,
  * RLS policies included. The CLI writes through this (direct Postgres

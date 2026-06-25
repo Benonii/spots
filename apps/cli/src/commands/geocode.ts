@@ -11,7 +11,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import pLimit from "p-limit";
-import type { GeoResult } from "@date-finder/db";
+import type { GeoResult } from "@spots/db";
 import { db, schema } from "../db.ts";
 import { getEnv, requireKeys } from "../env.ts";
 import { geocodeVenue } from "../lib/places.ts";

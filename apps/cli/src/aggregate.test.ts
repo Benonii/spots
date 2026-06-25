@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
 import { aggregateSpot, type VideoForAgg } from "./aggregate.ts";
-import type { Extraction, GeoResult } from "@date-finder/db";
+import type { Extraction, GeoResult } from "@spots/db";
 
 const geo: GeoResult = {
   placeId: "p1",

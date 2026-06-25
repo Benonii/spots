@@ -3,7 +3,7 @@
  * numbers stay debuggable (docs/architecture.md §5). Formulas from docs/schemas.md
  * §3 (quality) and §4 (price). Pure functions, unit-tested.
  */
-import type { QualitySignals } from "@date-finder/db";
+import type { QualitySignals } from "@spots/db";
 
 export const QUALITY_WEIGHTS = {
   aesthetic: 1.0,

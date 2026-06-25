@@ -15,7 +15,7 @@ import { consola } from "consola";
 import { generateObject } from "ai";
 import { eq, isNull, sql } from "drizzle-orm";
 import pLimit from "p-limit";
-import type { TopComment } from "@date-finder/db";
+import type { TopComment } from "@spots/db";
 import { db, schema } from "../db.ts";
 import { getModel } from "../lib/llm.ts";
 import { extractionSchema } from "../extraction.ts";

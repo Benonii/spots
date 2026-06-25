@@ -102,13 +102,13 @@ date_finder/
 ├─ .env                         # CLI secrets (gitignored)
 ├─ .env.example                 # committed, documents every var from §1.2
 ├─ packages/
-│  └─ db/                       # @date-finder/db — the data layer, shared
+│  └─ db/                       # @spots/db — the data layer, shared
 │     ├─ src/schema.ts          # ← move docs/schema.ts here (source of truth)
 │     ├─ src/index.ts           # re-export schema + inferred types (Spot, NewSpot, …)
 │     ├─ drizzle.config.ts      # entities.roles.provider:"supabase" (RLS emit)
 │     └─ drizzle/               # generated migrations (committed)
 └─ apps/
-   ├─ cli/                      # @date-finder/cli — this plan
+   ├─ cli/                      # @spots/cli — this plan
    │  └─ src/
    │     ├─ index.ts            # citty command tree / entrypoint
    │     ├─ env.ts              # Zod-validated env loader
@@ -118,7 +118,7 @@ date_finder/
    │     ├─ aggregate.ts        # multi-video → spot field merge
    │     ├─ commands/           # one file per stage (scrape, comments, normalize, …)
    │     └─ lib/                # ytdlp.ts, scrapfly.ts, places.ts, llm.ts, throttle.ts
-   └─ web/                      # TanStack stub (separate task; type-imports @date-finder/db)
+   └─ web/                      # TanStack stub (separate task; type-imports @spots/db)
 ```
 
 Why a shared `packages/db`: the frontend needs the inferred `Spot` types (`schema.ts`
