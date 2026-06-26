@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { qualityScore, priceLevel } from "./scoring.ts";
-import type { QualitySignals } from "@spots/db";
+import { qualityScore, priceLevel } from "./scoring";
+import type { QualitySignals } from "./schema";
 
 const signals: QualitySignals = {
   dimensions: { aesthetic: 4.5, vibe: 4.0, food: 3.5, value: 4.0, service: 3.0 },
@@ -15,6 +15,9 @@ describe("qualityScore", () => {
   test("3+ videos → evidenceFactor 1.00", () => {
     expect(qualityScore(signals, 3)).toBe(77); // 3.84*20*1.00 = 76.8
     expect(qualityScore(signals, 9)).toBe(77); // capped at 3
+  });
+  test("0 videos (manual spot) → evidenceFactor 0.85", () => {
+    expect(qualityScore(signals, 0)).toBe(65); // 3.84*20*0.85 = 65.28
   });
   test("all-zero dimensions → 0", () => {
     const z: QualitySignals = {

@@ -143,7 +143,26 @@ export const spots = pgTable(
     coverImageUrl: text("cover_image_url"),
     sourceVideoUrl: text("source_video_url"), // representative (top) video link
 
-
+    // ── curation ──────────────────────────────────────────────────────────
+    // 'scrape' = produced by the pipeline (keyed on a real google_place_id);
+    // 'manual' = hand-added by an admin (id is 'manual:<uuid>', no videos).
+    source: text("source").notNull().default("scrape"),
+    // admin who owns this row. null for unclaimed scraped spots. Regular admins
+    // may only edit/delete their own; supers may edit any.
+    ownerId: text("owner_id"),
+    // soft-delete / tombstone. A scraped spot can't be hard-deleted (the next
+    // upsert would resurrect it from source_videos), so "removing" one = hidden.
+    // Public reads filter these out; admins still see them to un-hide.
+    hidden: boolean("hidden").notNull().default(false),
+    mapUrl: text("map_url"), // pasted Google Maps link (manual spots' Maps button)
+    // names of columns an admin has edited; the scrape upsert skips these so
+    // human edits are never reverted. See apps/cli/src/commands/upsert.ts.
+    lockedFields: text("locked_fields")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    createdBy: text("created_by"), // admin auth.uid() for manual spots; null for scrape
+    updatedBy: text("updated_by"), // last admin to edit
 
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
@@ -165,10 +184,40 @@ export const spots = pgTable(
     // App-facing read access. Defining a policy auto-enables RLS on this table.
     // Both roles: anonymous-auth visitors carry the `authenticated` role, and a
     // first-time visitor reads spots before the anonymous sign-in completes.
+    // Hidden (tombstoned) spots are filtered out of public reads.
     pgPolicy("public read spots", {
       for: "select",
       to: [anonRole, authenticatedRole],
-      using: sql`true`,
+      using: sql`not ${t.hidden}`,
+    }),
+    // Admins additionally see hidden spots (to review / un-hide them). Multiple
+    // permissive SELECT policies OR together, so this widens admin visibility.
+    pgPolicy("admins read all spots", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`is_admin()`,
+    }),
+    // Admins may create only manually-curated spots they own. The scraper writes
+    // via the RLS-bypassing CLI connection, so it is unaffected by these.
+    pgPolicy("admins insert manual spots", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`is_admin() and ${t.ownerId} = (select auth.uid())::text and ${t.source} = 'manual'`,
+    }),
+    // Supers edit any spot; regular admins edit only their own.
+    pgPolicy("admins update own spots", {
+      for: "update",
+      to: authenticatedRole,
+      using: sql`is_super_admin() or (is_admin() and ${t.ownerId} = (select auth.uid())::text)`,
+      withCheck: sql`is_super_admin() or (is_admin() and ${t.ownerId} = (select auth.uid())::text)`,
+    }),
+    // Hard delete is restricted to MANUAL spots (a scraped row would resurrect on
+    // the next upsert — "remove" a scraped spot by setting hidden=true instead).
+    // Supers may delete any manual spot; regular admins only their own.
+    pgPolicy("admins delete own manual spots", {
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`${t.source} = 'manual' and (is_super_admin() or (is_admin() and ${t.ownerId} = (select auth.uid())::text))`,
     }),
   ],
 );
@@ -278,6 +327,14 @@ export const visits = pgTable(
  *
  * `id` equals `auth.uid()`. Anyone signed in can read all profiles (display data
  * only — no email); a user may only write their own (`auth.uid() = id`).
+ *
+ * `role` is the curation authority: 'user' (default) < 'admin' < 'super'. It lives
+ * here so "who is an admin" travels with identity, but it is NOT user-writable:
+ * the migration REVOKEs INSERT/UPDATE on this column from the `authenticated` role
+ * (so the self-write policies below can't touch it and a user can't escalate
+ * themselves), and the only way to change it is the SECURITY DEFINER `set_role()`
+ * function, callable by supers (and the RLS-bypassing CLI for bootstrap). The
+ * `is_admin()`/`is_super_admin()` helpers read this column with definer rights.
  */
 export const profiles = pgTable(
   "profiles",
@@ -285,11 +342,15 @@ export const profiles = pgTable(
     id: text("id").primaryKey(), // = auth.uid()
     displayName: text("display_name"),
     avatarUrl: text("avatar_url"),
+    // curation role — write-locked at the column level (see migration); changed
+    // only via set_role(). Default keeps every normal sign-up a plain user.
+    role: text("role").notNull().default("user"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
+    check("profiles_role_check", sql`${t.role} in ('user','admin','super')`),
     pgPolicy("public read profiles", {
       for: "select",
       to: authenticatedRole,
@@ -545,6 +606,10 @@ export type NewSourceVideo = typeof sourceVideos.$inferInsert;
 
 export type Visit = typeof visits.$inferSelect;
 export type NewVisit = typeof visits.$inferInsert;
+
+export type Profile = typeof profiles.$inferSelect;
+export type NewProfile = typeof profiles.$inferInsert;
+export type Role = Profile["role"]; // 'user' | 'admin' | 'super' (string at the type level)
 
 export type Feedback = typeof feedback.$inferSelect;
 export type NewFeedback = typeof feedback.$inferInsert;

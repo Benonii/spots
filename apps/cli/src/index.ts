@@ -18,6 +18,7 @@ import { upsertCommand } from "./commands/upsert.ts";
 import { coversCommand } from "./commands/covers.ts";
 import { ingestCommand } from "./commands/ingest.ts";
 import { analyticsCommand } from "./commands/analytics.ts";
+import { adminCommand } from "./commands/admin.ts";
 import {
   migrateCommand,
   generateCommand,
@@ -39,6 +40,7 @@ const main = defineCommand({
     covers: coversCommand,
     ingest: ingestCommand,
     analytics: analyticsCommand,
+    admin: adminCommand,
     migrate: migrateCommand,
     generate: generateCommand,
     push: pushCommand,

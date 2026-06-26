@@ -8,10 +8,20 @@
  */
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { inArray, isNotNull } from "drizzle-orm";
+import { inArray, isNotNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { db, schema } from "../db.ts";
 import { aggregateSpot, type VideoForAgg } from "../aggregate.ts";
 import { ensureCoversBucket, isRehosted, rehostCover, storageConfigured } from "../lib/storage.ts";
+
+/**
+ * On re-upsert, keep the existing column value when an admin has locked the
+ * logical field it belongs to (spots.locked_fields), otherwise take the freshly
+ * scraped value. This is what makes manual edits survive scrapes — see the
+ * curation columns in packages/db/src/schema.ts.
+ */
+function keepIfLocked(lockKey: string, column: AnyColumn, excludedCol: string): SQL {
+  return sql`case when ${lockKey} = any(${schema.spots.lockedFields}) then ${column} else excluded.${sql.raw(excludedCol)} end`;
+}
 
 export const upsertCommand = defineCommand({
   meta: {
@@ -124,10 +134,37 @@ export const upsertCommand = defineCommand({
         updatedAt: new Date(),
       };
 
+      // On conflict, refresh scrape-owned fields but defer to admin edits on the
+      // six curatable logical fields (name, description, location, tags, price,
+      // map). Columns absent here — owner_id, source, hidden, locked_fields,
+      // created_by, updated_by, map_url — are never written by the scrape, so
+      // curation state is preserved automatically.
+      const setOnConflict = {
+        name: keepIfLocked("name", schema.spots.name, "name"),
+        summary: keepIfLocked("description", schema.spots.summary, "summary"),
+        neighborhood: keepIfLocked("location", schema.spots.neighborhood, "neighborhood"),
+        address: keepIfLocked("location", schema.spots.address, "address"),
+        lat: keepIfLocked("location", schema.spots.lat, "lat"),
+        lng: keepIfLocked("location", schema.spots.lng, "lng"),
+        priceMin: keepIfLocked("price", schema.spots.priceMin, "price_min"),
+        priceMax: keepIfLocked("price", schema.spots.priceMax, "price_max"),
+        priceCurrency: keepIfLocked("price", schema.spots.priceCurrency, "price_currency"),
+        priceBasis: keepIfLocked("price", schema.spots.priceBasis, "price_basis"),
+        priceLevel: keepIfLocked("price", schema.spots.priceLevel, "price_level"),
+        tags: keepIfLocked("tags", schema.spots.tags, "tags"),
+        // scrape-owned, never admin-editable — always refreshed:
+        qualityScore: values.qualityScore,
+        qualitySignals: values.qualitySignals,
+        videoCount: values.videoCount,
+        coverImageUrl: values.coverImageUrl,
+        sourceVideoUrl: values.sourceVideoUrl,
+        updatedAt: values.updatedAt,
+      };
+
       const [spot] = await db
         .insert(schema.spots)
         .values(values)
-        .onConflictDoUpdate({ target: schema.spots.googlePlaceId, set: values })
+        .onConflictDoUpdate({ target: schema.spots.googlePlaceId, set: setOnConflict })
         .returning({ id: schema.spots.id });
 
       await db

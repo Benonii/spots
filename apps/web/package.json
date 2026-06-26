@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@spots/db": "workspace:*",
     "@radix-ui/react-slider": "^1.4.1",
     "@radix-ui/react-tooltip": "^1.2.10",
     "@supabase/supabase-js": "^2.108.1",
