@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
-import type { CommunityVisit, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
 import { fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
   deleteVisit,
@@ -72,6 +73,16 @@ function NearIcon() {
   );
 }
 
+function CurateIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
 function ChevIcon({ open }: { open: boolean }) {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -126,6 +137,8 @@ export function App() {
   const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
+  const isAdmin = role === "admin" || role === "super";
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -176,8 +189,10 @@ export function App() {
       setVisited([]);
       setSaved(new Set());
       setCommunity([]);
+      setRole(null);
       return;
     }
+    void fetchMyRole(user.id).then(setRole).catch(() => setRole("user"));
     void upsertProfile(user).catch(() => {}); // best-effort; don't block the log
     fetchVisits(user.id)
       .then(async (rows) => {
@@ -235,6 +250,8 @@ export function App() {
   const filtered = useMemo(() => {
     const q = query.trim();
     let list: Spot[] = q ? fuse.search(q).map((r) => r.item) : (spots ?? []).slice();
+    // admins read hidden spots too (RLS) — keep tombstoned ones out of discovery
+    list = list.filter((s) => !s.hidden);
     if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
@@ -523,7 +540,7 @@ export function App() {
       <div className="appstate">
         <h2>No spots yet</h2>
         <p>
-          Run the ingestion pipeline (<code>df ingest</code>) to populate the spots table.
+          Run the ingestion pipeline (<code>spots ingest</code>) to populate the spots table.
         </p>
       </div>
     );
@@ -552,6 +569,14 @@ export function App() {
               <span className="near-link-label">Near me</span>
             </Link>
           </Tooltip>
+          {isAdmin && (
+            <Tooltip label="Curation studio">
+              <Link to="/admin" className="curate-link" aria-label="Curation studio">
+                <CurateIcon />
+                <span className="curate-link-label">Curate</span>
+              </Link>
+            </Tooltip>
+          )}
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>

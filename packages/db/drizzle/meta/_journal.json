@@ -85,6 +85,13 @@
       "when": 1782471403945,
       "tag": "0011_wooden_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1782471500000,
+      "tag": "0012_admin_covers",
+      "breakpoints": true
     }
   ]
 }
