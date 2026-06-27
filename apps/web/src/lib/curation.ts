@@ -33,13 +33,18 @@ export async function fetchMyRole(userId: string): Promise<Role> {
 
 const safeKey = (placeId: string) => placeId.replace(/[^a-z0-9]/gi, "_");
 
-/** Upload (or replace) a spot's cover image; returns its permanent public URL. */
+/**
+ * Upload a spot's cover image; returns its permanent public URL. Each upload goes
+ * to a UNIQUE path (never overwrites), so the storage policy can be INSERT-only —
+ * a signed-in user can't replace or delete an existing cover, only add new objects.
+ * A replaced cover just leaves the old object orphaned (cheap to garbage-collect).
+ */
 export async function uploadCover(placeId: string, file: File): Promise<string> {
   const ext =
     (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-  const path = `${safeKey(placeId)}.${ext}`;
+  const path = `${safeKey(placeId)}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   const { error } = await supabase.storage.from(COVERS_BUCKET).upload(path, file, {
-    upsert: true,
+    upsert: false,
     contentType: file.type || "image/jpeg",
     cacheControl: "3600",
   });
