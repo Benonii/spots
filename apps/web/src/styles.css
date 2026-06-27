@@ -1165,7 +1165,8 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 /* ── in-place edit: floating pencil on the spot card (admins only) ──────── */
 .spotcard { position: relative; }
 .spot-edit-fab {
-  position: absolute; top: 12px; right: 12px; z-index: 6;
+  /* z-index clears Leaflet's panes/controls so it floats over the map column */
+  position: absolute; top: 12px; right: 12px; z-index: 1100;
   display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; cursor: pointer; color: var(--green-deep);
   background: color-mix(in oklab, var(--card) 82%, transparent);
@@ -1182,10 +1183,6 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 }
 .spot-edit-fab:active { transform: scale(0.93); }
 .spot-edit-fab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-style: solid; }
-/* desktop: the cover is the 330px left column, so pin the pencil to ITS top-right */
-@media (min-width: 901px) {
-  .spot-edit-fab { right: auto; left: 278px; }
-}
 
 /* icon-only topbar control (super's Team button) */
 .curate-icon-only { padding: 8px; }
