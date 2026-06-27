@@ -623,7 +623,7 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .topbar { order: 0; }
   .filtermenu { display: block; order: 1; position: relative; z-index: 50; margin-bottom: 12px; }
   .cat-chips { order: 2; }
-  .spotcard, .noresults { order: 3; }
+  .spot-stage, .noresults { order: 3; }
   .saved-section { order: 4; }
   .visited-section { order: 5; }
   .community-section { order: 6; }
