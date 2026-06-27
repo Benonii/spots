@@ -180,7 +180,10 @@ export async function updateSpot(
     patch.price_level = priceLevel(draft.priceMin, draft.priceMax, draft.priceBasis);
     changed.add("price");
   }
-  if (coverFile) patch.cover_image_url = await uploadCover(spot.google_place_id, coverFile);
+  if (coverFile) {
+    patch.cover_image_url = await uploadCover(spot.google_place_id, coverFile);
+    changed.add("cover"); // lock it so the scrape can't revert the new cover
+  }
 
   patch.locked_fields = [...new Set([...(spot.locked_fields ?? []), ...changed])];
 

@@ -152,11 +152,12 @@ export const upsertCommand = defineCommand({
         priceBasis: keepIfLocked("price", schema.spots.priceBasis, "price_basis"),
         priceLevel: keepIfLocked("price", schema.spots.priceLevel, "price_level"),
         tags: keepIfLocked("tags", schema.spots.tags, "tags"),
+        // an admin-set cover is locked too, so a re-scrape won't revert it:
+        coverImageUrl: keepIfLocked("cover", schema.spots.coverImageUrl, "cover_image_url"),
         // scrape-owned, never admin-editable — always refreshed:
         qualityScore: values.qualityScore,
         qualitySignals: values.qualitySignals,
         videoCount: values.videoCount,
-        coverImageUrl: values.coverImageUrl,
         sourceVideoUrl: values.sourceVideoUrl,
         updatedAt: values.updatedAt,
       };
