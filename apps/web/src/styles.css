@@ -1029,7 +1029,9 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 
 /* ════════════ editor sheet ════════════ */
 .ed-scrim {
-  position: fixed; inset: 0; z-index: 110; display: flex; justify-content: flex-end;
+  /* above Leaflet's panes/controls (~1000) and the edit pencil (1100), so the
+     map and pencil can't bleed through the sheet */
+  position: fixed; inset: 0; z-index: 2000; display: flex; justify-content: flex-end;
   background: color-mix(in oklab, var(--green-deep) 28%, transparent);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
   animation: ed-fade 0.2s ease;
