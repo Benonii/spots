@@ -92,6 +92,13 @@
       "when": 1782471500000,
       "tag": "0012_admin_covers",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782471600000,
+      "tag": "0013_relax_cover_upload",
+      "breakpoints": true
     }
   ]
 }

@@ -83,7 +83,12 @@ export async function createSpot(
 ): Promise<Spot> {
   if (draft.lat == null || draft.lng == null) throw new Error("A location is required.");
   const placeId = `manual:${crypto.randomUUID()}`;
-  const coverUrl = await uploadCover(placeId, coverFile);
+  let coverUrl: string;
+  try {
+    coverUrl = await uploadCover(placeId, coverFile);
+  } catch (e) {
+    throw new Error(`Cover upload failed — ${e instanceof Error ? e.message : String(e)}`);
+  }
   const row = {
     google_place_id: placeId,
     name: draft.name.trim(),
@@ -108,7 +113,7 @@ export async function createSpot(
     created_by: userId,
   };
   const { data, error } = await supabase.from("spots").insert(row).select("*").single();
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Saving the spot failed — ${error.message}`);
   return data as Spot;
 }
 
