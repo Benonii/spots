@@ -34,6 +34,7 @@ function blankDraft(): SpotDraft {
     name: "",
     description: "",
     mapUrl: "",
+    tiktokUrl: "",
     lat: null,
     lng: null,
     neighborhood: "",
@@ -55,6 +56,7 @@ function draftFromSpot(s: Spot): SpotDraft {
     name: s.name,
     description: s.summary ?? "",
     mapUrl: s.map_url ?? "",
+    tiktokUrl: s.source_video_url ?? "",
     lat: s.lat,
     lng: s.lng,
     neighborhood: s.neighborhood ?? "",
@@ -302,6 +304,19 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
               inputMode="url"
             />
             <MapStatus state={mapState} />
+          </Field>
+
+          <Field
+            label="TikTok link"
+            hint="Optional — adds a Watch button and makes the cover open the video."
+          >
+            <input
+              className="ed-input"
+              value={draft.tiktokUrl}
+              onChange={(e) => set("tiktokUrl", e.target.value)}
+              placeholder="https://www.tiktok.com/@…/video/…"
+              inputMode="url"
+            />
           </Field>
 
           <div className="ed-grid2">

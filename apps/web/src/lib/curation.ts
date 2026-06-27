@@ -59,6 +59,7 @@ export type SpotDraft = {
   name: string;
   description: string;
   mapUrl: string;
+  tiktokUrl: string; // optional → spots.source_video_url (Watch button + clickable cover)
   lat: number | null;
   lng: number | null;
   neighborhood: string;
@@ -112,6 +113,7 @@ export async function createSpot(
     summary: draft.description.trim() || null,
     video_count: 0,
     cover_image_url: coverUrl,
+    source_video_url: draft.tiktokUrl.trim() || null,
     map_url: draft.mapUrl.trim() || null,
     source: "manual",
     owner_id: userId,
@@ -165,6 +167,11 @@ export async function updateSpot(
   }
   const mapUrl = draft.mapUrl.trim() || null;
   if (mapUrl !== (spot.map_url ?? null)) patch.map_url = mapUrl; // not scrape-owned; no lock needed
+  const tiktok = draft.tiktokUrl.trim() || null;
+  if (tiktok !== (spot.source_video_url ?? null)) {
+    patch.source_video_url = tiktok;
+    changed.add("video"); // lock so a re-scrape keeps the admin's link
+  }
   if (!sameTags(draft.tags, spot.tags)) {
     patch.tags = draft.tags;
     changed.add("tags");
