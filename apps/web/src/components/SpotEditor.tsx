@@ -12,6 +12,7 @@ import {
   createSpot,
   deleteSpot,
   draftScore,
+  setSpotHidden,
   updateSpot,
   type SpotDraft,
 } from "../lib/curation";
@@ -77,6 +78,7 @@ type Props = {
   spot?: Spot;
   userId: string;
   canDelete: boolean;
+  canHide: boolean;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -84,7 +86,7 @@ type Props = {
 
 type Status = "idle" | "saving" | "error";
 
-export function SpotEditor({ mode, spot, userId, canDelete, onClose, onSaved, onDeleted }: Props) {
+export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, onSaved, onDeleted }: Props) {
   const [draft, setDraft] = useState<SpotDraft>(() =>
     mode === "edit" && spot ? draftFromSpot(spot) : blankDraft(),
   );
@@ -210,6 +212,19 @@ export function SpotEditor({ mode, spot, userId, canDelete, onClose, onSaved, on
     } catch (err) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Couldn't delete. Try again.");
+    }
+  };
+
+  const onToggleHidden = async () => {
+    if (!spot) return;
+    setStatus("saving");
+    setErrorMsg(null);
+    try {
+      await setSpotHidden(spot.id, !spot.hidden);
+      onSaved();
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Couldn't update. Try again.");
     }
   };
 
@@ -420,22 +435,29 @@ export function SpotEditor({ mode, spot, userId, canDelete, onClose, onSaved, on
           )}
 
           <div className="ed-actions">
-            {mode === "edit" && canDelete ? (
-              confirmDelete ? (
-                <span className="ed-del-confirm">
-                  Delete for good?
-                  <button type="button" className="ed-del-yes" onClick={onConfirmDelete}>
-                    Yes, delete
-                  </button>
-                  <button type="button" className="ed-del-no" onClick={() => setConfirmDelete(false)}>
-                    Keep
-                  </button>
-                </span>
-              ) : (
-                <button type="button" className="ed-delete" onClick={() => setConfirmDelete(true)}>
-                  Delete
+            {mode === "edit" && confirmDelete ? (
+              <span className="ed-del-confirm">
+                Delete for good?
+                <button type="button" className="ed-del-yes" onClick={onConfirmDelete}>
+                  Yes, delete
                 </button>
-              )
+                <button type="button" className="ed-del-no" onClick={() => setConfirmDelete(false)}>
+                  Keep
+                </button>
+              </span>
+            ) : mode === "edit" && (canHide || canDelete) ? (
+              <span className="ed-left-actions">
+                {canHide && (
+                  <button type="button" className="ed-delete" onClick={onToggleHidden}>
+                    {spot?.hidden ? "Unhide" : "Hide"}
+                  </button>
+                )}
+                {canDelete && (
+                  <button type="button" className="ed-delete" onClick={() => setConfirmDelete(true)}>
+                    Delete
+                  </button>
+                )}
+              </span>
             ) : (
               <span />
             )}

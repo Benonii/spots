@@ -9,7 +9,6 @@ import {
 } from "@tanstack/react-router";
 import { App } from "./App";
 import { NearMe } from "./NearMe";
-import { Admin } from "./Admin";
 import { WhatsNewButton } from "./components/WhatsNewButton";
 import { FeedbackLauncher } from "./components/FeedbackLauncher";
 import "leaflet/dist/leaflet.css";
@@ -30,13 +29,8 @@ const nearRoute = createRoute({
   path: "/near",
   component: NearMe,
 });
-const adminRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/admin",
-  component: Admin,
-});
 const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, nearRoute, adminRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, nearRoute]),
 });
 
 declare module "@tanstack/react-router" {

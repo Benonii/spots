@@ -27,6 +27,8 @@ import { CommunityTable } from "./components/CommunityTable";
 import { AuthButton } from "./components/AuthButton";
 import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
+import { SpotEditor } from "./components/SpotEditor";
+import { TeamSheet } from "./components/TeamSheet";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -73,12 +75,22 @@ function NearIcon() {
   );
 }
 
-function CurateIcon() {
+function PlusIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 19a5.5 5.5 0 0 0-3-4.9" />
     </svg>
   );
 }
@@ -139,6 +151,10 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const isAdmin = role === "admin" || role === "super";
+  const [editing, setEditing] = useState<{ mode: "create" } | { mode: "edit"; spot: Spot } | null>(
+    null,
+  );
+  const [teamOpen, setTeamOpen] = useState(false);
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -570,11 +586,28 @@ export function App() {
             </Link>
           </Tooltip>
           {isAdmin && (
-            <Tooltip label="Curation studio">
-              <Link to="/admin" className="curate-link" aria-label="Curation studio">
-                <CurateIcon />
-                <span className="curate-link-label">Curate</span>
-              </Link>
+            <Tooltip label="Add a spot">
+              <button
+                type="button"
+                className="curate-link"
+                onClick={() => setEditing({ mode: "create" })}
+                aria-label="Add a spot"
+              >
+                <PlusIcon />
+                <span className="curate-link-label">Add spot</span>
+              </button>
+            </Tooltip>
+          )}
+          {role === "super" && (
+            <Tooltip label="Team & access">
+              <button
+                type="button"
+                className="curate-link curate-icon-only"
+                onClick={() => setTeamOpen(true)}
+                aria-label="Team and access"
+              >
+                <TeamIcon />
+              </button>
             </Tooltip>
           )}
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
@@ -673,6 +706,8 @@ export function App() {
           onToggleVisited={toggleVisited}
           isSaved={isSaved}
           onToggleSaved={toggleSaved}
+          canEdit={isAdmin && (role === "super" || current.owner_id === user?.id)}
+          onEdit={() => setEditing({ mode: "edit", spot: current })}
         />
       ) : (
         <div className="noresults">
@@ -785,6 +820,34 @@ export function App() {
           <CommunityTable entries={community} spotsById={spotsById} />
         </section>
       )}
+
+      {editing && user && (
+        <SpotEditor
+          mode={editing.mode}
+          spot={editing.mode === "edit" ? editing.spot : undefined}
+          userId={user.id}
+          canDelete={
+            editing.mode === "edit" &&
+            editing.spot.source === "manual" &&
+            (role === "super" || editing.spot.owner_id === user.id)
+          }
+          canHide={
+            editing.mode === "edit" &&
+            (role === "super" || editing.spot.owner_id === user.id)
+          }
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            loadSpots();
+          }}
+          onDeleted={() => {
+            setEditing(null);
+            loadSpots();
+          }}
+        />
+      )}
+
+      {teamOpen && user && <TeamSheet meId={user.id} onClose={() => setTeamOpen(false)} />}
     </div>
   );
 }
