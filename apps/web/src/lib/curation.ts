@@ -8,7 +8,11 @@
  */
 import { supabase } from "./supabase";
 import { qualityScore, priceLevel } from "@spots/db/scoring";
-import type { Dimensions, Profile, Role, Spot } from "./types";
+import type { Profile, Role, Spot } from "./types";
+import { diffSpot, type SpotDraft } from "./spot-diff";
+
+export { diffSpot } from "./spot-diff";
+export type { SpotDraft } from "./spot-diff";
 
 const COVERS_BUCKET = "spot-covers";
 
@@ -54,32 +58,12 @@ export async function uploadCover(placeId: string, file: File): Promise<string> 
 
 /* ── spot create / edit / hide / delete ─────────────────────────────────── */
 
-/** The admin-editable shape of a spot — maps onto the six curatable fields. */
-export type SpotDraft = {
-  name: string;
-  description: string;
-  mapUrl: string;
-  tiktokUrl: string; // optional → spots.source_video_url (Watch button + clickable cover)
-  lat: number | null;
-  lng: number | null;
-  neighborhood: string;
-  address: string;
-  tags: string[];
-  priceMin: number | null;
-  priceMax: number | null;
-  priceBasis: "per_person" | "total" | "unknown";
-  dimensions: Dimensions;
-};
-
 const EMPTY_EVIDENCE = { positiveMentions: 0, negativeMentions: 0, aestheticMentions: 0 };
 
 /** A live preview of how this draft will score (same formula as the scraper). */
 export function draftScore(d: Pick<SpotDraft, "dimensions">): number {
   return qualityScore({ dimensions: d.dimensions }, 0);
 }
-
-const sameTags = (a: string[], b: string[]) =>
-  a.length === b.length && a.every((t, i) => t === b[i]);
 
 /** Create a hand-curated spot owned by the admin. A cover image is required. */
 export async function createSpot(
@@ -125,8 +109,8 @@ export async function createSpot(
 }
 
 /**
- * Patch an existing spot with only what changed, and record which curatable
- * fields were touched in `locked_fields` so the next scrape won't revert them.
+ * Patch an existing spot with only what changed, recording touched fields in
+ * `locked_fields` so the next scrape won't revert them.
  */
 export async function updateSpot(
   spot: Spot,
@@ -134,64 +118,13 @@ export async function updateSpot(
   draft: SpotDraft,
   coverFile: File | null,
 ): Promise<void> {
-  const changed = new Set<string>();
-  const patch: Record<string, unknown> = {
-    updated_by: userId,
-    updated_at: new Date().toISOString(),
-  };
-
-  const name = draft.name.trim();
-  if (name && name !== spot.name) {
-    patch.name = name;
-    changed.add("name");
-  }
-  const desc = draft.description.trim() || null;
-  if (desc !== (spot.summary ?? null)) {
-    patch.summary = desc;
-    changed.add("description");
-  }
-  if (draft.lat != null && draft.lng != null && (draft.lat !== spot.lat || draft.lng !== spot.lng)) {
-    patch.lat = draft.lat;
-    patch.lng = draft.lng;
-    changed.add("location");
-  }
-  const nb = draft.neighborhood.trim() || null;
-  if (nb !== (spot.neighborhood ?? null)) {
-    patch.neighborhood = nb;
-    changed.add("location");
-  }
-  const addr = draft.address.trim() || null;
-  if (addr !== (spot.address ?? null)) {
-    patch.address = addr;
-    changed.add("location");
-  }
-  const mapUrl = draft.mapUrl.trim() || null;
-  if (mapUrl !== (spot.map_url ?? null)) patch.map_url = mapUrl; // not scrape-owned; no lock needed
-  const tiktok = draft.tiktokUrl.trim() || null;
-  if (tiktok !== (spot.source_video_url ?? null)) {
-    patch.source_video_url = tiktok;
-    changed.add("video"); // lock so a re-scrape keeps the admin's link
-  }
-  if (!sameTags(draft.tags, spot.tags)) {
-    patch.tags = draft.tags;
-    changed.add("tags");
-  }
-  if (
-    draft.priceMin !== spot.price_min ||
-    draft.priceMax !== spot.price_max ||
-    draft.priceBasis !== spot.price_basis
-  ) {
-    patch.price_min = draft.priceMin;
-    patch.price_max = draft.priceMax;
-    patch.price_basis = draft.priceBasis;
-    patch.price_level = priceLevel(draft.priceMin, draft.priceMax, draft.priceBasis);
-    changed.add("price");
-  }
+  const { patch, changed } = diffSpot(spot, draft);
+  patch.updated_by = userId;
+  patch.updated_at = new Date().toISOString();
   if (coverFile) {
     patch.cover_image_url = await uploadCover(spot.google_place_id, coverFile);
     changed.add("cover"); // lock it so the scrape can't revert the new cover
   }
-
   patch.locked_fields = [...new Set([...(spot.locked_fields ?? []), ...changed])];
 
   const { error } = await supabase.from("spots").update(patch).eq("id", spot.id);
