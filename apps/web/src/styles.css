@@ -977,15 +977,13 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 .curate-link {
   display: inline-flex; align-items: center; gap: 8px; flex: none; cursor: pointer;
   font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600;
-  color: var(--green-deep); text-decoration: none;
-  background: color-mix(in oklab, var(--green) 12%, var(--bg));
-  border: 1px solid color-mix(in oklab, var(--green) 26%, transparent);
+  color: var(--ink); text-decoration: none;
+  background: var(--bg); border: 1px solid var(--line);
   border-radius: 999px; padding: 8px 15px;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 .curate-link:hover {
-  background: color-mix(in oklab, var(--green) 18%, var(--bg));
-  border-color: var(--sage); transform: translateY(-1px);
+  background: var(--surface-2); border-color: var(--sage); transform: translateY(-1px);
 }
 .curate-link svg { flex: none; }
 .curate-link-label { white-space: nowrap; }
