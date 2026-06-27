@@ -257,7 +257,7 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
               <span className="ed-cover-empty">
                 <ImageIcon />
                 <span>Add a cover photo</span>
-                <small>Tap to choose · landscape looks best</small>
+                <small>Tap to choose · a tall, portrait photo looks best</small>
               </span>
             )}
             <input

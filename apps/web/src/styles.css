@@ -1055,8 +1055,11 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 
 /* cover picker */
 .ed-cover {
-  position: relative; display: block; cursor: pointer; border-radius: 14px; overflow: hidden;
-  aspect-ratio: 16 / 9; background: var(--line-soft);
+  /* centered portrait box mirroring how covers actually display (tall column /
+     TikTok 9:16), so the preview matches the result */
+  position: relative; display: block; width: min(240px, 72%); margin-inline: auto;
+  cursor: pointer; border-radius: 14px; overflow: hidden;
+  aspect-ratio: 4 / 5; background: var(--line-soft);
   border: 1px dashed var(--line); transition: border-color 0.15s ease;
 }
 .ed-cover[data-has="1"] { border-style: solid; }
