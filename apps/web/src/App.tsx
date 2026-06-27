@@ -84,6 +84,16 @@ function PlusIcon() {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
 function TeamIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -696,19 +706,30 @@ export function App() {
       </section>
 
       {current ? (
-        <SpotCard
-          spot={current}
-          index={Math.min(index, total - 1)}
-          total={total}
-          onPrev={() => go(-1)}
-          onNext={() => go(1)}
-          isVisited={isVisited}
-          onToggleVisited={toggleVisited}
-          isSaved={isSaved}
-          onToggleSaved={toggleSaved}
-          canEdit={isAdmin && (role === "super" || current.owner_id === user?.id)}
-          onEdit={() => setEditing({ mode: "edit", spot: current })}
-        />
+        <div className="spot-stage">
+          {isAdmin && (role === "super" || current.owner_id === user?.id) && (
+            <button
+              type="button"
+              className="spot-edit-fab"
+              aria-label={`Edit ${current.name}`}
+              title="Edit this spot"
+              onClick={() => setEditing({ mode: "edit", spot: current })}
+            >
+              <PencilIcon />
+            </button>
+          )}
+          <SpotCard
+            spot={current}
+            index={Math.min(index, total - 1)}
+            total={total}
+            onPrev={() => go(-1)}
+            onNext={() => go(1)}
+            isVisited={isVisited}
+            onToggleVisited={toggleVisited}
+            isSaved={isSaved}
+            onToggleSaved={toggleSaved}
+          />
+        </div>
       ) : (
         <div className="noresults">
           No spots match these filters.{" "}

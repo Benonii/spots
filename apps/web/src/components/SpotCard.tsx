@@ -71,16 +71,6 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function PencilIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-    </svg>
-  );
-}
-
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
     <svg
@@ -217,8 +207,6 @@ export function SpotCard({
   isSaved,
   onToggleSaved,
   showBreakdown = true,
-  canEdit = false,
-  onEdit,
 }: {
   spot: Spot;
   index: number;
@@ -230,8 +218,6 @@ export function SpotCard({
   isSaved: boolean;
   onToggleSaved: () => void;
   showBreakdown?: boolean;
-  canEdit?: boolean;
-  onEdit?: () => void;
 }) {
   const stars = spot.quality_score / 20;
   const dims = spot.quality_signals.dimensions;
@@ -360,21 +346,6 @@ export function SpotCard({
         }
       }}
     >
-      {canEdit && onEdit && (
-        <button
-          type="button"
-          className="spot-edit-fab"
-          aria-label={`Edit ${spot.name}`}
-          title="Edit this spot"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          <PencilIcon />
-        </button>
-      )}
-
       {spot.source_video_url ? (
         <a
           className="spot-cover"
