@@ -12,7 +12,7 @@
  *   neighborhood → from the highest-engagement video that named one
  */
 import type { Extraction, GeoResult, QualitySignals } from "@spots/db";
-import { priceLevel, qualityScore, type PriceBasis } from "./scoring.ts";
+import { priceLevel, qualityScore, type PriceBasis } from "@spots/db/scoring";
 
 export type VideoForAgg = {
   extraction: Extraction;

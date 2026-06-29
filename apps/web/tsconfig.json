@@ -6,5 +6,8 @@
     "types": [],
     "noEmit": true
   },
-  "include": ["src", "vite.config.ts", "vite-env.d.ts"]
+  "include": ["src", "vite.config.ts", "vite-env.d.ts"],
+  // test files run under `bun test` (which provides bun:test); keep them out of
+  // the browser tsc, whose types:[] intentionally omits Bun globals.
+  "exclude": ["src/**/*.test.ts"]
 }

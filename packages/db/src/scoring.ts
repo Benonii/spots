@@ -1,9 +1,15 @@
 /**
- * Deterministic scoring + price bucketing — owned by the CLI so the sortable
- * numbers stay debuggable (docs/architecture.md §5). Formulas from docs/schemas.md
- * §3 (quality) and §4 (price). Pure functions, unit-tested.
+ * Deterministic scoring + price bucketing — the single source of truth for the
+ * sortable numbers (docs/architecture.md §5). Formulas from docs/schemas.md §3
+ * (quality) and §4 (price). Pure, side-effect-free, and imports only TYPES from
+ * the schema (erased at build), so it's safe to pull into the browser via the
+ * `@spots/db/scoring` subpath: the CLI scores scraped spots and the web admin
+ * form scores manually curated ones with the exact same function.
  */
-import type { QualitySignals } from "@spots/db";
+import type { QualitySignals } from "./schema";
+
+/** The five subjective dimensions a quality score is built from, each 0..5. */
+export type ScoreDimensions = QualitySignals["dimensions"];
 
 export const QUALITY_WEIGHTS = {
   aesthetic: 1.0,
@@ -18,11 +24,17 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 /**
  * quality_score, 0..100.
  *   base           = Σ(wᵢ·dᵢ) / Σ(wᵢ)              (0..5, over dimensions present)
- *   evidenceFactor = 0.85 + 0.05·min(videoCount,3) (0.90 @1 video → 1.00 @3+)
+ *   evidenceFactor = 0.85 + 0.05·min(videoCount,3) (0.85 @0 videos → 1.00 @3+)
  *   score          = clamp(round(base·20·evidenceFactor), 0, 100)
+ *
+ * Reads only the dimensions; the mention-count `evidence` carried alongside them
+ * in a scraped spot's signals is intentionally not part of the score. A manually
+ * curated spot therefore scores identically by passing its dimensions with
+ * `videoCount: 0` (lands the evidence factor on its 0.85 floor — a slight,
+ * principled discount for an entry with no corroborating videos).
  */
 export function qualityScore(
-  signals: QualitySignals,
+  signals: { dimensions: ScoreDimensions },
   videoCount: number,
 ): number {
   const dims = signals.dimensions;

@@ -37,6 +37,13 @@ export type Spot = {
   cover_image_url: string | null;
   source_video_url: string | null;
   first_seen_at: string;
+  // curation (admin) columns — present on every row since migration 0011
+  source?: "scrape" | "manual";
+  owner_id?: string | null;
+  hidden?: boolean;
+  map_url?: string | null;
+  locked_fields?: string[];
+  updated_at?: string;
 };
 
 /**
@@ -67,11 +74,15 @@ export type VisitPatch = Partial<
   >
 >;
 
+/** Curation authority. Mirrors profiles.role. */
+export type Role = "user" | "admin" | "super";
+
 /** Public display identity (from the `profiles` table). */
 export type Profile = {
   id: string;
   displayName: string | null;
   avatarUrl: string | null;
+  role?: Role;
 };
 
 /** A visit shown in the community "everyone's been" feed, with its author. */

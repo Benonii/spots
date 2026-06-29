@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
-import type { CommunityVisit, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
 import { fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
   deleteVisit,
@@ -26,6 +27,8 @@ import { CommunityTable } from "./components/CommunityTable";
 import { AuthButton } from "./components/AuthButton";
 import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
+import { SpotEditor } from "./components/SpotEditor";
+import { TeamSheet } from "./components/TeamSheet";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -68,6 +71,36 @@ function NearIcon() {
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z" />
       <circle cx="12" cy="10.5" r="2.3" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 19a5.5 5.5 0 0 0-3-4.9" />
     </svg>
   );
 }
@@ -126,6 +159,12 @@ export function App() {
   const [community, setCommunity] = useState<CommunityVisit[]>([]);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
+  const isAdmin = role === "admin" || role === "super";
+  const [editing, setEditing] = useState<{ mode: "create" } | { mode: "edit"; spot: Spot } | null>(
+    null,
+  );
+  const [teamOpen, setTeamOpen] = useState(false);
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -176,8 +215,10 @@ export function App() {
       setVisited([]);
       setSaved(new Set());
       setCommunity([]);
+      setRole(null);
       return;
     }
+    void fetchMyRole(user.id).then(setRole).catch(() => setRole("user"));
     void upsertProfile(user).catch(() => {}); // best-effort; don't block the log
     fetchVisits(user.id)
       .then(async (rows) => {
@@ -235,6 +276,8 @@ export function App() {
   const filtered = useMemo(() => {
     const q = query.trim();
     let list: Spot[] = q ? fuse.search(q).map((r) => r.item) : (spots ?? []).slice();
+    // admins read hidden spots too (RLS) — keep tombstoned ones out of discovery
+    list = list.filter((s) => !s.hidden);
     if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
@@ -523,7 +566,7 @@ export function App() {
       <div className="appstate">
         <h2>No spots yet</h2>
         <p>
-          Run the ingestion pipeline (<code>df ingest</code>) to populate the spots table.
+          Run the ingestion pipeline (<code>spots ingest</code>) to populate the spots table.
         </p>
       </div>
     );
@@ -552,6 +595,31 @@ export function App() {
               <span className="near-link-label">Near me</span>
             </Link>
           </Tooltip>
+          {isAdmin && (
+            <Tooltip label="Add a spot">
+              <button
+                type="button"
+                className="curate-link"
+                onClick={() => setEditing({ mode: "create" })}
+                aria-label="Add a spot"
+              >
+                <PlusIcon />
+                <span className="curate-link-label">Add spot</span>
+              </button>
+            </Tooltip>
+          )}
+          {role === "super" && (
+            <Tooltip label="Team & access">
+              <button
+                type="button"
+                className="curate-link curate-icon-only"
+                onClick={() => setTeamOpen(true)}
+                aria-label="Team and access"
+              >
+                <TeamIcon />
+              </button>
+            </Tooltip>
+          )}
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
       </header>
@@ -638,17 +706,30 @@ export function App() {
       </section>
 
       {current ? (
-        <SpotCard
-          spot={current}
-          index={Math.min(index, total - 1)}
-          total={total}
-          onPrev={() => go(-1)}
-          onNext={() => go(1)}
-          isVisited={isVisited}
-          onToggleVisited={toggleVisited}
-          isSaved={isSaved}
-          onToggleSaved={toggleSaved}
-        />
+        <div className="spot-stage">
+          {isAdmin && (role === "super" || current.owner_id === user?.id) && (
+            <button
+              type="button"
+              className="spot-edit-fab"
+              aria-label={`Edit ${current.name}`}
+              title="Edit this spot"
+              onClick={() => setEditing({ mode: "edit", spot: current })}
+            >
+              <PencilIcon />
+            </button>
+          )}
+          <SpotCard
+            spot={current}
+            index={Math.min(index, total - 1)}
+            total={total}
+            onPrev={() => go(-1)}
+            onNext={() => go(1)}
+            isVisited={isVisited}
+            onToggleVisited={toggleVisited}
+            isSaved={isSaved}
+            onToggleSaved={toggleSaved}
+          />
+        </div>
       ) : (
         <div className="noresults">
           No spots match these filters.{" "}
@@ -760,6 +841,34 @@ export function App() {
           <CommunityTable entries={community} spotsById={spotsById} />
         </section>
       )}
+
+      {editing && user && (
+        <SpotEditor
+          mode={editing.mode}
+          spot={editing.mode === "edit" ? editing.spot : undefined}
+          userId={user.id}
+          canDelete={
+            editing.mode === "edit" &&
+            editing.spot.source === "manual" &&
+            (role === "super" || editing.spot.owner_id === user.id)
+          }
+          canHide={
+            editing.mode === "edit" &&
+            (role === "super" || editing.spot.owner_id === user.id)
+          }
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            loadSpots();
+          }}
+          onDeleted={() => {
+            setEditing(null);
+            loadSpots();
+          }}
+        />
+      )}
+
+      {teamOpen && user && <TeamSheet meId={user.id} onClose={() => setTeamOpen(false)} />}
     </div>
   );
 }

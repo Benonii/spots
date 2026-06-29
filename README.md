@@ -78,4 +78,5 @@ saved spots, OAuth, feedback, and analytics are all shipped. Remaining CLI nicet
 
 ```bash
 bun test --cwd apps/cli   # scoring + aggregate unit tests
+bun test --cwd apps/web   # maps-url parser + spot-edit diff/lock unit tests
 ```

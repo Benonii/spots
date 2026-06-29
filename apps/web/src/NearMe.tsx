@@ -106,7 +106,8 @@ export function NearMe() {
   useEffect(() => {
     geo.request();
     fetchSpots()
-      .then(setSpots)
+      // admins read hidden spots too (RLS) — keep tombstoned ones out of "Near me"
+      .then((all) => setSpots(all.filter((s) => !s.hidden)))
       .catch(() => setLoadFailed(true));
     // request is stable; run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
