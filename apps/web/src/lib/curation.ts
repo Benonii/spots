@@ -146,6 +146,16 @@ export async function deleteSpot(spotId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Permanently delete a spot by place id (super only). Suppresses the place so a
+ * scraped spot can't resurrect on the next upsert, then removes the row —
+ * atomically, server-side, via the super-gated purge_spot() function.
+ */
+export async function purgeSpot(googlePlaceId: string): Promise<void> {
+  const { error } = await supabase.rpc("purge_spot", { place_id: googlePlaceId });
+  if (error) throw new Error(error.message);
+}
+
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
 
@@ -189,17 +199,19 @@ export async function listAdmins(): Promise<Profile[]> {
   return (data ?? []).map((r) => toProfile(r as Record<string, unknown>));
 }
 
-/** Search signed-in people by display name (to promote them). */
-export async function searchProfiles(query: string): Promise<Profile[]> {
+/** A profile plus the email behind it (admins only, via the search_profiles RPC). */
+export type ProfileMatch = Profile & { email: string | null };
+
+/** Search signed-in people by display name OR email (to promote them). */
+export async function searchProfiles(query: string): Promise<ProfileMatch[]> {
   const q = query.trim();
   if (!q) return [];
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, avatar_url, role")
-    .ilike("display_name", `%${q}%`)
-    .limit(8);
+  const { data, error } = await supabase.rpc("search_profiles", { query: q });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => toProfile(r as Record<string, unknown>));
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    ...toProfile(r),
+    email: (r.email as string | null) ?? null,
+  }));
 }
 
 /** Change a user's role. Server-enforced super-only via the set_role() function. */

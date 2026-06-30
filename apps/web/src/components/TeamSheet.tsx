@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { Profile, Role } from "../lib/types";
-import { listAdmins, searchProfiles, setRole as setUserRole } from "../lib/curation";
+import { listAdmins, searchProfiles, setRole as setUserRole, type ProfileMatch } from "../lib/curation";
 
 /**
  * Super-admin "Team & access" — granted/revoked in place (no page). Reuses the
@@ -10,7 +10,7 @@ import { listAdmins, searchProfiles, setRole as setUserRole } from "../lib/curat
 export function TeamSheet({ meId, onClose }: { meId: string; onClose: () => void }) {
   const [admins, setAdmins] = useState<Profile[]>([]);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<Profile[]>([]);
+  const [results, setResults] = useState<ProfileMatch[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -49,7 +49,7 @@ export function TeamSheet({ meId, onClose }: { meId: string; onClose: () => void
     const t = setTimeout(() => {
       searchProfiles(q)
         .then((r) => setResults(r.filter((p) => p.role !== "admin" && p.role !== "super")))
-        .catch(() => {});
+        .catch((e: unknown) => setNote(`Search failed: ${e instanceof Error ? e.message : String(e)}`));
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
@@ -139,7 +139,10 @@ export function TeamSheet({ meId, onClose }: { meId: string; onClose: () => void
               <ul className="adm-results">
                 {results.map((p) => (
                   <li key={p.id}>
-                    <span>{p.displayName ?? "Someone"}</span>
+                    <span className="adm-result-who">
+                      <span className="adm-result-name">{p.displayName ?? "Someone"}</span>
+                      {p.email && <span className="adm-result-email">{p.email}</span>}
+                    </span>
                     <button className="adm-mini" onClick={() => change(p.id, "admin")}>
                       Make admin
                     </button>

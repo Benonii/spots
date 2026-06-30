@@ -29,6 +29,7 @@ import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
 import { SpotEditor } from "./components/SpotEditor";
 import { TeamSheet } from "./components/TeamSheet";
+import { AdminMenu } from "./components/AdminMenu";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -75,32 +76,12 @@ function NearIcon() {
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <path d="M8 3v10M3 8h10" />
-    </svg>
-  );
-}
-
 function PencilIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
       strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-    </svg>
-  );
-}
-
-function TeamIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="9" cy="8" r="3" />
-      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
-      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 19a5.5 5.5 0 0 0-3-4.9" />
     </svg>
   );
 }
@@ -165,6 +146,8 @@ export function App() {
     null,
   );
   const [teamOpen, setTeamOpen] = useState(false);
+  // admins can flip the carousel into a review queue of hidden draft spots
+  const [showDrafts, setShowDrafts] = useState(false);
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -273,21 +256,29 @@ export function App() {
     [spots],
   );
 
+  const draftCount = useMemo(() => (spots ?? []).filter((s) => s.hidden).length, [spots]);
+
   const filtered = useMemo(() => {
     const q = query.trim();
     let list: Spot[] = q ? fuse.search(q).map((r) => r.item) : (spots ?? []).slice();
-    // admins read hidden spots too (RLS) — keep tombstoned ones out of discovery
-    list = list.filter((s) => !s.hidden);
+    // admins read hidden spots too (RLS). Normally keep them out of discovery;
+    // in "drafts" mode the carousel becomes a review queue of just the hidden ones.
+    list = showDrafts ? list.filter((s) => s.hidden) : list.filter((s) => !s.hidden);
     if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
     return list.sort(COMPARATORS[sort] ?? COMPARATORS.quality);
-  }, [spots, fuse, query, area, price, categories, sort]);
+  }, [spots, fuse, query, area, price, categories, sort, showDrafts]);
 
   // reset position when the filter set changes
   useEffect(() => {
     setIndex(0);
-  }, [area, price, sort, query, categories]);
+  }, [area, price, sort, query, categories, showDrafts]);
+
+  // once every draft is published, fall back to the published view
+  useEffect(() => {
+    if (showDrafts && draftCount === 0) setShowDrafts(false);
+  }, [showDrafts, draftCount]);
 
   // land on a "want to go" target once it appears in the filtered list
   useEffect(() => {
@@ -596,29 +587,14 @@ export function App() {
             </Link>
           </Tooltip>
           {isAdmin && (
-            <Tooltip label="Add a spot">
-              <button
-                type="button"
-                className="curate-link"
-                onClick={() => setEditing({ mode: "create" })}
-                aria-label="Add a spot"
-              >
-                <PlusIcon />
-                <span className="curate-link-label">Add spot</span>
-              </button>
-            </Tooltip>
-          )}
-          {role === "super" && (
-            <Tooltip label="Team & access">
-              <button
-                type="button"
-                className="curate-link curate-icon-only"
-                onClick={() => setTeamOpen(true)}
-                aria-label="Team and access"
-              >
-                <TeamIcon />
-              </button>
-            </Tooltip>
+            <AdminMenu
+              isSuper={role === "super"}
+              draftCount={draftCount}
+              showDrafts={showDrafts}
+              onAddSpot={() => setEditing({ mode: "create" })}
+              onToggleDrafts={() => setShowDrafts((d) => !d)}
+              onOpenTeam={() => setTeamOpen(true)}
+            />
           )}
           <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         </div>
@@ -855,6 +831,9 @@ export function App() {
           canHide={
             editing.mode === "edit" &&
             (role === "super" || editing.spot.owner_id === user.id)
+          }
+          canPurge={
+            editing.mode === "edit" && role === "super" && editing.spot.source !== "manual"
           }
           onClose={() => setEditing(null)}
           onSaved={() => {

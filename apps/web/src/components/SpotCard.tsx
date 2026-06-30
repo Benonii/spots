@@ -314,6 +314,7 @@ export function SpotCard({
 
   const coverChildren = (
     <>
+      {spot.hidden && <span className="spot-draft-tag">Draft · hidden</span>}
       <span className="cover-area">{spot.neighborhood ?? "Addis Ababa"}</span>
       <span className="cover-count">
         {spot.video_count} TikTok {spot.video_count === 1 ? "review" : "reviews"}

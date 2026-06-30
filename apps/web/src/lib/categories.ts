@@ -28,6 +28,11 @@ export const CATEGORIES: Category[] = [
     tags: ["dessert", "bakery", "cake", "pastry", "cheesecake", "chocolate", "ice-cream", "donut", "cookie"],
   },
   { key: "grill", label: "Grill & Steak", tags: ["steak", "bbq", "grill", "meat", "roast"] },
+  // source filter (not a cuisine): spots imported from the @me_says channel
+  { key: "me_says", label: "me_says", tags: ["me_says"] },
+  // type/amenity filters
+  { key: "activity", label: "Activity", tags: ["activity"] },
+  { key: "outlets", label: "Outlets available", tags: ["sockets", "outlet", "outlets", "power", "outlet_available", "outlets_available"] },
 ];
 
 /** True if the spot belongs to any of the selected categories (empty = all pass). */

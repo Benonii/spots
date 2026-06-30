@@ -506,6 +506,25 @@ export const events = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* suppressed_places — google_place_ids a super-admin permanently killed     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A scraped spot can't just be deleted — the next `spots upsert` would re-create
+ * it from its source_videos. So "permanent delete" (super only) records the
+ * place id here and removes the spots row, atomically, via the SECURITY DEFINER
+ * purge_spot() function (see migration). The upsert skips any place id listed
+ * here, so it never comes back. RLS on, no policy => only the function (definer)
+ * and the RLS-bypassing CLI connection touch it.
+ */
+export const suppressedPlaces = pgTable("suppressed_places", {
+  googlePlaceId: text("google_place_id").primaryKey(),
+  reason: text("reason"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/* ------------------------------------------------------------------ */
 /* source_videos — raw per-video provenance (CLI-internal, anon has no access) */
 /* ------------------------------------------------------------------ */
 
@@ -616,3 +635,6 @@ export type NewFeedback = typeof feedback.$inferInsert;
 
 export type AnalyticsEvent = typeof events.$inferSelect;
 export type NewAnalyticsEvent = typeof events.$inferInsert;
+
+export type SuppressedPlace = typeof suppressedPlaces.$inferSelect;
+export type NewSuppressedPlace = typeof suppressedPlaces.$inferInsert;
