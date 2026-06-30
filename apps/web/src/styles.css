@@ -144,19 +144,53 @@ body {
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
 .whatsnew-btn:hover { border-color: var(--sage); background: var(--press); transform: translateY(-1px); }
-.auth-user { display: flex; align-items: center; gap: 9px; }
+.auth-user { position: relative; display: inline-flex; align-items: center; gap: 9px; }
+.auth-trigger {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: none; border: 0; padding: 0; border-radius: 999px; cursor: default;
+}
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
 .auth-avatar-fallback {
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--primary); color: #fff; font-size: 0.8438rem; font-family: var(--serif-d);
 }
 .auth-name { font-size: 0.8438rem; color: var(--ink); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.auth-signout {
+
+/* normal screens: the visible inline Sign out (original behaviour) */
+.auth-signout-inline {
   font-family: var(--serif-b); font-size: 0.75rem; color: var(--muted); cursor: pointer;
   background: none; border: none; padding: 4px 2px; text-decoration: underline;
   text-underline-offset: 2px; transition: color 0.15s ease;
 }
-.auth-signout:hover { color: var(--accent-text); }
+.auth-signout-inline:hover { color: var(--accent-text); }
+
+/* the popover is used ONLY on very narrow screens (see the <420px block) */
+.auth-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
+  min-width: 180px; display: none; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; box-shadow: 0 12px 34px rgba(44, 66, 50, 0.16);
+  animation: admin-pop-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.auth-pop-name {
+  font-size: 0.8125rem; color: var(--muted); padding: 7px 11px 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.auth-signout {
+  display: flex; width: 100%; cursor: pointer; text-align: left;
+  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink);
+  background: none; border: 0; border-radius: 8px; padding: 9px 11px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.auth-signout:hover { background: var(--press); color: var(--accent-text); }
+
+/* under 420px: hide the inline button, tuck Sign out under the avatar */
+@media (max-width: 419px) {
+  .auth-trigger { cursor: pointer; padding: 3px; transition: background 0.15s ease; }
+  .auth-trigger:hover { background: var(--press); }
+  .auth-signout-inline { display: none; }
+  .auth-user.open .auth-pop { display: flex; }
+}
 
 /* ---------- controls ---------- */
 .controls {
@@ -783,7 +817,6 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .navbtn { width: 44px; height: 44px; }
   .vt-remove { width: 40px; height: 40px; top: 6px; right: 6px; }
   .edit-star { padding: 5px; }
-  .auth-signout { padding: 8px 4px; }
 }
 
 /* ---------- Shiplog changelog panel ----------
@@ -1023,6 +1056,9 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 .adm-promote > input:focus { border-color: var(--sage); box-shadow: var(--focus-ring); }
 .adm-results { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .adm-results li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.9063rem; padding: 4px 2px; }
+.adm-result-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.adm-result-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-result-email { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-promote-hint { margin: 8px 0 0; font-size: 0.75rem; color: var(--muted); }
 
 /* ════════════ editor sheet ════════════ */
@@ -1189,6 +1225,38 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 .spot-edit-fab:active { transform: scale(0.93); }
 .spot-edit-fab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-style: solid; }
 
-/* icon-only topbar control (super's Team button) */
-.curate-icon-only { padding: 8px; }
 .ed-left-actions { display: inline-flex; align-items: center; gap: 4px; }
+
+/* admin: "Draft" badge on a hidden spot's cover */
+.spot-draft-tag {
+  position: absolute; top: 12px; right: 12px; z-index: 3;
+  font-family: var(--serif-b); font-size: 0.6875rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; color: #fffefb;
+  background: var(--accent-text); padding: 4px 9px; border-radius: 7px;
+}
+
+/* admin: one topbar control → popover menu (keeps the topbar compact on mobile) */
+.admin-menu { position: relative; }
+.admin-menu.open .admin-menu-btn { border-color: var(--sage); background: var(--surface-2); }
+.admin-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
+  min-width: 204px; display: none; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; box-shadow: 0 12px 34px rgba(44, 66, 50, 0.16);
+  animation: admin-pop-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.admin-menu.open .admin-pop { display: flex; }
+@keyframes admin-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.admin-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer;
+  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink);
+  background: none; border: 0; border-radius: 8px; padding: 9px 11px; text-align: left;
+  transition: background 0.12s ease;
+}
+.admin-item:hover { background: var(--press); }
+.admin-item svg { flex: none; color: var(--ink-soft); }
+.admin-item-count {
+  margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  font-size: 0.6875rem; font-weight: 700; color: #fffefb; background: var(--accent-text);
+}

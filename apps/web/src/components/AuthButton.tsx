@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Tooltip } from "./Tooltip";
 
@@ -34,24 +35,73 @@ export function AuthButton({
     );
   }
 
+  return <AuthMenu user={user} onSignOut={onSignOut} />;
+}
+
+/** Signed-in control: avatar (+ name on wider screens) → popover with Sign out. */
+function AuthMenu({ user, onSignOut }: { user: User; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
   const meta = user.user_metadata ?? {};
   const name =
     (meta.full_name as string) || (meta.name as string) || user.email || "Account";
   const avatar = (meta.avatar_url as string) || (meta.picture as string) || "";
 
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="auth-user">
-      {avatar ? (
-        <img className="auth-avatar" src={avatar} alt="" referrerPolicy="no-referrer" />
-      ) : (
-        <span className="auth-avatar auth-avatar-fallback">
-          {name.charAt(0).toUpperCase()}
-        </span>
-      )}
-      <span className="auth-name">{name}</span>
-      <button className="auth-signout" onClick={onSignOut} title="Sign out">
+    <div className={"auth-user" + (open ? " open" : "")} ref={wrapRef}>
+      <button
+        type="button"
+        className="auth-trigger"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account"
+      >
+        {avatar ? (
+          <img className="auth-avatar" src={avatar} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="auth-avatar auth-avatar-fallback">{name.charAt(0).toUpperCase()}</span>
+        )}
+        <span className="auth-name">{name}</span>
+      </button>
+
+      {/* visible on normal screens */}
+      <button type="button" className="auth-signout-inline" onClick={onSignOut}>
         Sign out
       </button>
+
+      {/* under the avatar on very narrow screens (<420px) */}
+      <div className="auth-pop" role="menu" aria-label="Account">
+        <span className="auth-pop-name">{name}</span>
+        <button
+          type="button"
+          className="auth-signout"
+          role="menuitem"
+          onClick={() => {
+            setOpen(false);
+            onSignOut();
+          }}
+        >
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }

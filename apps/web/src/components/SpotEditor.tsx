@@ -11,6 +11,7 @@ import type { Dimensions, Spot } from "../lib/types";
 import {
   createSpot,
   deleteSpot,
+  purgeSpot,
   draftScore,
   setSpotHidden,
   updateSpot,
@@ -81,6 +82,7 @@ type Props = {
   userId: string;
   canDelete: boolean;
   canHide: boolean;
+  canPurge: boolean;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -88,7 +90,7 @@ type Props = {
 
 type Status = "idle" | "saving" | "error";
 
-export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, onSaved, onDeleted }: Props) {
+export function SpotEditor({ mode, spot, userId, canDelete, canHide, canPurge, onClose, onSaved, onDeleted }: Props) {
   const [draft, setDraft] = useState<SpotDraft>(() =>
     mode === "edit" && spot ? draftFromSpot(spot) : blankDraft(),
   );
@@ -98,6 +100,7 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
 
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -230,6 +233,19 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
     }
   };
 
+  const onConfirmPurge = async () => {
+    if (!spot) return;
+    setStatus("saving");
+    setErrorMsg(null);
+    try {
+      await purgeSpot(spot.google_place_id);
+      onDeleted();
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Couldn't delete. Try again.");
+    }
+  };
+
   return (
     <div className="ed-scrim" onClick={onClose}>
       <div
@@ -287,8 +303,8 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
               value={draft.description}
               onChange={(e) => set("description", e.target.value)}
               placeholder="Roastery-cafe with standing tables and the best macchiato in Addis…"
-              rows={3}
-              maxLength={600}
+              rows={7}
+              maxLength={750}
             />
           </Field>
 
@@ -460,7 +476,17 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
                   Keep
                 </button>
               </span>
-            ) : mode === "edit" && (canHide || canDelete) ? (
+            ) : mode === "edit" && confirmPurge ? (
+              <span className="ed-del-confirm">
+                Delete permanently? It won't come back on the next scrape.
+                <button type="button" className="ed-del-yes" onClick={onConfirmPurge}>
+                  Yes, delete
+                </button>
+                <button type="button" className="ed-del-no" onClick={() => setConfirmPurge(false)}>
+                  Keep
+                </button>
+              </span>
+            ) : mode === "edit" && (canHide || canDelete || canPurge) ? (
               <span className="ed-left-actions">
                 {canHide && (
                   <button type="button" className="ed-delete" onClick={onToggleHidden}>
@@ -470,6 +496,11 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, onClose, on
                 {canDelete && (
                   <button type="button" className="ed-delete" onClick={() => setConfirmDelete(true)}>
                     Delete
+                  </button>
+                )}
+                {canPurge && (
+                  <button type="button" className="ed-delete" onClick={() => setConfirmPurge(true)}>
+                    Delete permanently
                   </button>
                 )}
               </span>

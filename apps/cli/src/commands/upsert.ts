@@ -46,15 +46,26 @@ export const upsertCommand = defineCommand({
       return;
     }
 
-    // Group by place id.
+    // Places a super-admin permanently deleted — never re-create them.
+    const suppressed = new Set(
+      (await db.select({ id: schema.suppressedPlaces.googlePlaceId }).from(schema.suppressedPlaces)).map(
+        (r) => r.id,
+      ),
+    );
+
+    // Group by place id (skipping suppressed ones).
     const groups = new Map<string, typeof rows>();
     for (const r of rows) {
       if (!r.geo || !r.extraction) continue;
       const key = r.geo.placeId;
+      if (suppressed.has(key)) continue;
       (groups.get(key) ?? groups.set(key, []).get(key)!).push(r);
     }
 
-    consola.info(`Upserting ${groups.size} spots from ${rows.length} videos…`);
+    consola.info(
+      `Upserting ${groups.size} spots from ${rows.length} videos…` +
+        (suppressed.size ? ` (${suppressed.size} suppressed place(s) skipped)` : ""),
+    );
 
     // Re-host cover thumbnails into Storage so they don't expire (best-effort:
     // if Storage isn't configured we keep the raw TikTok URL).
