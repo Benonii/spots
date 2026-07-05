@@ -16,6 +16,7 @@ import {
 } from "./lib/visits";
 import { upsertProfile } from "./lib/profiles";
 import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
+import { areaTier } from "./lib/areas";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
 import { track, trackAppOpen } from "./lib/analytics";
@@ -264,10 +265,18 @@ export function App() {
     // admins read hidden spots too (RLS). Normally keep them out of discovery;
     // in "drafts" mode the carousel becomes a review queue of just the hidden ones.
     list = showDrafts ? list.filter((s) => s.hidden) : list.filter((s) => !s.hidden);
-    if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
-    return list.sort(COMPARATORS[sort] ?? COMPARATORS.quality);
+    const cmp = (COMPARATORS[sort] ?? COMPARATORS.quality) as (a: Spot, b: Spot) => number;
+    if (area === "All areas") return list.sort(cmp);
+    // Area filter groups related neighborhoods ("4 Kilo", "4 Kilo (Abrehot)",
+    // "Arat Kilo") and ranks by match specificity; chosen sort breaks ties.
+    const tier = new Map<Spot, number>();
+    for (const s of list) {
+      const t = areaTier(s.neighborhood, area);
+      if (t != null) tier.set(s, t);
+    }
+    return [...tier.keys()].sort((a, b) => tier.get(a)! - tier.get(b)! || cmp(a, b));
   }, [spots, fuse, query, area, price, categories, sort, showDrafts]);
 
   // reset position when the filter set changes
