@@ -16,6 +16,7 @@ import {
 } from "./lib/visits";
 import { upsertProfile } from "./lib/profiles";
 import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
+import { areaTier } from "./lib/areas";
 import { CATEGORIES, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
 import { track, trackAppOpen } from "./lib/analytics";
@@ -249,9 +250,17 @@ export function App() {
   const fuse = useMemo(
     () =>
       new Fuse(spots ?? [], {
-        keys: ["name", "summary", "neighborhood", "tags"],
+        // name dominates: a spot *named* like the query should beat one whose
+        // summary merely mentions it
+        keys: [
+          { name: "name", weight: 3 },
+          { name: "tags", weight: 1.5 },
+          { name: "neighborhood", weight: 1 },
+          { name: "summary", weight: 0.5 },
+        ],
         threshold: 0.4,
         ignoreLocation: true,
+        includeScore: true,
       }),
     [spots],
   );
@@ -260,14 +269,47 @@ export function App() {
 
   const filtered = useMemo(() => {
     const q = query.trim();
-    let list: Spot[] = q ? fuse.search(q).map((r) => r.item) : (spots ?? []).slice();
+    // While searching, relevance leads: exact name match, then name prefix,
+    // then Fuse's fuzzy score. The chosen sort only breaks remaining ties —
+    // typing a spot's exact name must surface that spot first.
+    const rank = new Map<Spot, [pin: number, score: number]>();
+    let list: Spot[];
+    if (q) {
+      const nq = q.toLowerCase();
+      for (const r of fuse.search(q)) {
+        const name = r.item.name.toLowerCase();
+        const pin = name === nq ? 0 : name.startsWith(nq) ? 1 : 2;
+        rank.set(r.item, [pin, r.score ?? 1]);
+      }
+      list = [...rank.keys()];
+    } else {
+      list = (spots ?? []).slice();
+    }
     // admins read hidden spots too (RLS). Normally keep them out of discovery;
     // in "drafts" mode the carousel becomes a review queue of just the hidden ones.
     list = showDrafts ? list.filter((s) => s.hidden) : list.filter((s) => !s.hidden);
-    if (area !== "All areas") list = list.filter((s) => s.neighborhood === area);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
-    return list.sort(COMPARATORS[sort] ?? COMPARATORS.quality);
+    // Area filter groups related neighborhoods ("4 Kilo", "4 Kilo (Abrehot)",
+    // "Arat Kilo") and ranks by match specificity.
+    const tier = new Map<Spot, number>();
+    if (area !== "All areas") {
+      list = list.filter((s) => {
+        const t = areaTier(s.neighborhood, area);
+        if (t == null) return false;
+        tier.set(s, t);
+        return true;
+      });
+    }
+    const cmp = (COMPARATORS[sort] ?? COMPARATORS.quality) as (a: Spot, b: Spot) => number;
+    return list.sort((a, b) => {
+      const ra = rank.get(a);
+      const rb = rank.get(b);
+      if (ra && rb && (ra[0] !== rb[0] || ra[1] !== rb[1])) {
+        return ra[0] - rb[0] || ra[1] - rb[1];
+      }
+      return (tier.get(a) ?? 0) - (tier.get(b) ?? 0) || cmp(a, b);
+    });
   }, [spots, fuse, query, area, price, categories, sort, showDrafts]);
 
   // reset position when the filter set changes
