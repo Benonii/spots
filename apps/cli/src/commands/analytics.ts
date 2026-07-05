@@ -17,26 +17,49 @@ export const analyticsCommand = defineCommand({
     const since = sql.raw(`now() - interval '${days} days'`);
     const actor = sql`coalesce(user_id, anon_id)`;
 
+    // One distinct-actor count per active day, reused for the average and the
+    // most-active-days list below. Averaging over active days (not all calendar
+    // days) avoids understating a freshly-launched app whose window has empty days.
+    const daily = (await db.execute(sql`
+      select date_trunc('day', created_at) as day,
+             count(distinct ${actor})       as actors
+      from events
+      where created_at > ${since}
+      group by 1
+      order by day
+    `)) as unknown as { day: string; actors: number }[];
+
+    const avgDau = daily.length
+      ? Math.round(daily.reduce((s, d) => s + Number(d.actors), 0) / daily.length)
+      : 0;
+
     const rows = (await db.execute(sql`
       select
         (select count(distinct ${actor}) from events
-           where created_at >= date_trunc('day', now()))        as dau_today,
-        (select count(distinct ${actor}) from events
            where created_at > ${since})                         as mau,
         (select count(*) from events where created_at > ${since}) as events
-    `)) as unknown as { dau_today: number; mau: number; events: number }[];
-    const totals = rows[0] ?? { dau_today: 0, mau: 0, events: 0 };
+    `)) as unknown as { mau: number; events: number }[];
+    const totals = rows[0] ?? { mau: 0, events: 0 };
 
-    const stickiness = totals.mau ? ((totals.dau_today / totals.mau) * 100).toFixed(1) : "0";
+    const stickiness = totals.mau ? ((avgDau / totals.mau) * 100).toFixed(1) : "0";
     consola.box(
       [
-        `Window:       last ${days} days`,
-        `DAU (today):  ${totals.dau_today}`,
-        `MAU:          ${totals.mau}`,
-        `Stickiness:   ${stickiness}%  (DAU/MAU)`,
-        `Events:       ${totals.events}`,
+        `Window:        last ${days} days`,
+        `Avg DAU:       ${avgDau}  (mean over ${daily.length} active day${daily.length === 1 ? "" : "s"})`,
+        `MAU:           ${totals.mau}`,
+        `Stickiness:    ${stickiness}%  (avg DAU/MAU)`,
+        `Events:        ${totals.events}`,
       ].join("\n"),
     );
+
+    const topDays = [...daily].sort((a, b) => Number(b.actors) - Number(a.actors)).slice(0, 5);
+    if (topDays.length) {
+      consola.info("Most active days");
+      for (const d of topDays) {
+        const label = new Date(d.day).toISOString().slice(0, 10);
+        consola.log(`  ${label}   ${d.actors} active user${Number(d.actors) === 1 ? "" : "s"}`);
+      }
+    }
 
     const features = (await db.execute(sql`
       select name,
