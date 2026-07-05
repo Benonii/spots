@@ -329,6 +329,7 @@ export function SpotCard({
   const coverStyle = { backgroundImage: coverImage(spot) };
 
   return (
+    <>
     <div
       className="spotcard"
       style={cardStyle}
@@ -454,22 +455,26 @@ export function SpotCard({
           </div>
         </div>
 
-        <div className="spot-nav">
-          <button className="navbtn" onClick={onPrev} aria-label="Previous">
-            <Chevron dir="left" />
-          </button>
-          <span className="nav-count">
-            {index + 1} <i>of</i> {total}
-          </span>
-          <button className="navbtn" onClick={onNext} aria-label="Next">
-            <Chevron dir="right" />
-          </button>
-        </div>
       </div>
 
       <div className="spot-right">
         <MapPanel spot={spot} />
       </div>
     </div>
+
+    {/* outside the card: stays visible however long the details run, and
+        doesn't tilt with the swipe transform */}
+    <div className="spot-nav">
+      <button className="navbtn" onClick={onPrev} aria-label="Previous">
+        <Chevron dir="left" />
+      </button>
+      <span className="nav-count">
+        {index + 1} <i>of</i> {total}
+      </span>
+      <button className="navbtn" onClick={onNext} aria-label="Next">
+        <Chevron dir="right" />
+      </button>
+    </div>
+    </>
   );
 }

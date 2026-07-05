@@ -18,6 +18,9 @@
   --focus-ring: 0 0 0 3px color-mix(in oklab, var(--primary) 26%, transparent);
   --shadow: none;
   --radius: 16px;
+  /* fixed spot-card height on desktop — tall enough for typical details;
+     longer ones scroll inside the card rather than resizing the deck */
+  --spotcard-h: 580px;
   --serif-d: "Quicksand", system-ui, sans-serif;
   --serif-b: "Quicksand", system-ui, sans-serif;
 }
@@ -290,10 +293,13 @@ body {
   /* [vertical cover] [details] [map] — the cover gets its own full-height column
      so portrait TikTok thumbnails show whole, with only minor side-cropping. */
   display: grid; grid-template-columns: 330px 1.05fr 0.95fr; gap: 0;
+  /* constant height so the deck doesn't jump while browsing; unusually long
+     details scroll inside their column instead of growing the card */
+  height: var(--spotcard-h);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  overflow: hidden; box-shadow: var(--shadow); margin-bottom: 38px;
+  overflow: hidden; box-shadow: var(--shadow);
 }
-.spot-left { padding: 24px 26px 22px; display: flex; flex-direction: column; }
+.spot-left { padding: 24px 26px 22px; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .spot-cover {
   background-size: cover; background-position: center; position: relative;
   overflow: hidden; border-right: 1px solid var(--line);
@@ -359,7 +365,7 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .bd-fill { display: block; height: 100%; background: var(--accent); border-radius: 6px; }
 .bd-num { font-size: 0.75rem; color: var(--muted); text-align: right; }
 
-.spot-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: auto; padding-top: 22px; }
+.spot-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 16px 0 38px; }
 .navbtn {
   width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: transparent;
   color: var(--ink-soft); cursor: pointer; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
@@ -520,6 +526,7 @@ a.spot-cover:hover { filter: brightness(1.06); }
 /* ---------- loading skeleton (mirrors the spot card so there's no jump) ---------- */
 .sk-card {
   display: grid; grid-template-columns: 330px 1.05fr 0.95fr;
+  height: var(--spotcard-h);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   overflow: hidden; margin-bottom: 38px;
 }
@@ -754,7 +761,10 @@ a.spot-cover:hover { filter: brightness(1.06); }
     border-color: rgba(255, 255, 255, 0.5);
   }
 
-  .spotcard { grid-template-columns: 1fr; touch-action: pan-y; will-change: transform; }
+  /* stacked layout grows with content; the cover keeps its fixed height below */
+  .spotcard { grid-template-columns: 1fr; height: auto; touch-action: pan-y; will-change: transform; }
+  .sk-card { height: auto; }
+  .spot-left { overflow-y: visible; }
   /* skeleton matches the mobile card: tall cover on top, map below */
   .sk-card { grid-template-columns: 1fr; }
   .sk-cover { min-height: clamp(360px, 52vh, 520px); border-right: none; border-bottom: 1px solid var(--line); }
