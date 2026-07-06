@@ -3,11 +3,11 @@ export type RunResult = { stdout: string; stderr: string; code: number };
 
 export async function run(
   cmd: string[],
-  opts: { allowNonZero?: boolean } = {},
+  opts: { allowNonZero?: boolean; env?: Record<string, string | undefined> } = {},
 ): Promise<RunResult> {
   let proc: ReturnType<typeof Bun.spawn>;
   try {
-    proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env: process.env });
+    proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env: opts.env ?? process.env });
   } catch (e) {
     // e.g. ENOENT when the binary isn't on PATH.
     throw new Error(`Could not run "${cmd[0]}": ${(e as Error).message}`);
