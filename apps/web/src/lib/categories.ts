@@ -6,9 +6,22 @@ import type { Spot } from "./types";
  * bridges multi-tag concepts like "Habesha" (ethiopian + traditional + kitfo…)
  * that no single tag captures. Tunable as the tag vocabulary grows.
  */
-export type Category = { key: string; label: string; tags: string[] };
+export type Category = {
+  key: string;
+  label: string;
+  tags: string[];
+  /** Predicate categories (e.g. "New") match on spot state instead of tags. */
+  match?: (spot: Spot) => boolean;
+};
+
+/** Spots first seen within the last 7 days — first_seen_at is set once on
+ * insert and never touched by re-scrapes, so the badge decays on its own. */
+export function isNewSpot(spot: Spot): boolean {
+  return Date.now() - new Date(spot.first_seen_at).getTime() < 7 * 24 * 60 * 60 * 1000;
+}
 
 export const CATEGORIES: Category[] = [
+  { key: "new", label: "New", tags: [], match: isNewSpot },
   {
     key: "habesha",
     label: "Habesha",
@@ -40,6 +53,8 @@ export function matchesCategories(spot: Spot, selected: Set<string>): boolean {
   if (selected.size === 0) return true;
   const spotTags = new Set(spot.tags.map((t) => t.toLowerCase()));
   return CATEGORIES.some(
-    (c) => selected.has(c.key) && c.tags.some((t) => spotTags.has(t)),
+    (c) =>
+      selected.has(c.key) &&
+      (c.match ? c.match(spot) : c.tags.some((t) => spotTags.has(t))),
   );
 }

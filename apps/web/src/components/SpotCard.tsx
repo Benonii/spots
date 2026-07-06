@@ -1,6 +1,7 @@
 import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
+import { isNewSpot } from "../lib/categories";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
@@ -368,7 +369,10 @@ export function SpotCard({
 
       <div className="spot-left">
         <div className="spot-headrow">
-          <h2 className="spot-name">{spot.name}</h2>
+          <h2 className="spot-name">
+            {spot.name}
+            {isNewSpot(spot) && <span className="tag-new">New</span>}
+          </h2>
           <button className={"been-btn" + (isVisited ? " on" : "")} onClick={onToggleVisited}>
             {isVisited ? "✓ Been here" : "Mark as been"}
           </button>

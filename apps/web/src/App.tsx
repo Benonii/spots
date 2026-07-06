@@ -17,7 +17,7 @@ import {
 import { upsertProfile } from "./lib/profiles";
 import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
 import { areaTier } from "./lib/areas";
-import { CATEGORIES, matchesCategories } from "./lib/categories";
+import { CATEGORIES, isNewSpot, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
 import { track, trackAppOpen } from "./lib/analytics";
 import { Dropdown, type Option } from "./components/Dropdown";
@@ -266,6 +266,9 @@ export function App() {
   );
 
   const draftCount = useMemo(() => (spots ?? []).filter((s) => s.hidden).length, [spots]);
+
+  // only offer the "New" chip while something actually carries the badge
+  const hasNew = useMemo(() => (spots ?? []).some(isNewSpot), [spots]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -712,7 +715,7 @@ export function App() {
           (chipFade.right ? " fade-right" : "")
         }
       >
-        {CATEGORIES.map((c) => (
+        {CATEGORIES.filter((c) => c.key !== "new" || hasNew).map((c) => (
           <button
             key={c.key}
             className={"cat-chip" + (categories.has(c.key) ? " on" : "")}

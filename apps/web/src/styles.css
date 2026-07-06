@@ -340,6 +340,13 @@ a.spot-cover:hover { filter: brightness(1.06); }
 
 .spot-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
 .tag { font-size: 0.7812rem; color: var(--green-deep); background: var(--surface-2); border: 1px solid var(--line); border-radius: 20px; padding: 4px 11px; letter-spacing: 0.02em; }
+/* spots first seen this week — small square badge beside the name */
+.tag-new {
+  display: inline-block; margin-left: 9px; padding: 3px 9px; border-radius: 7px; vertical-align: 3px;
+  font-family: var(--serif-b); font-size: 0.625rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--accent-text); background: transparent; border: 1px dashed var(--accent-text);
+}
 
 .spot-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
 .meta-block { min-width: 0; }
