@@ -32,6 +32,9 @@ const EnvSchema = z.object({
   // Path/name of the yt-dlp binary. Override if it isn't on PATH
   // (e.g. ~/.local/bin/yt-dlp from a standalone install).
   YT_DLP_BIN: z.string().default("yt-dlp"),
+  // Where `spots backup` writes pg_dump files. Machine-specific — override in
+  // .env on machines without the secondary drive.
+  BACKUP_DIR: z.string().default("/mnt/storage/spots/backups"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

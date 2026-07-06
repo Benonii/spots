@@ -413,9 +413,10 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .vt-entry { border-bottom: 1px solid var(--line-soft); }
 .vt-entry:last-child { border-bottom: none; }
 .vt-entry:hover { background: var(--surface-2); }
-.vt-place { font-family: var(--serif-d); font-size: 0.9062rem; font-weight: 500; color: var(--ink); }
+/* scoped under .vt-row so it outranks the `.vt-row span` catch-all below */
+.vt-row .vt-place { font-family: var(--serif-d); font-size: 0.9062rem; font-weight: 500; color: var(--ink); }
 .vt-row span { font-size: 0.8438rem; color: var(--ink-soft); }
-.vt-c-date { color: var(--muted); font-size: 0.7812rem; }
+.vt-row .vt-c-date { color: var(--muted); font-size: 0.7812rem; }
 
 /* per-row subjective sliders (our scores; feed future aggregate ratings) */
 .vt-sliders {
@@ -750,7 +751,16 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .filters-inner { display: block; }
   .controls { margin-bottom: 0; background: transparent; border: none; box-shadow: none; padding: 0; }
   /* 16px keeps iOS Safari from auto-zooming (and never zooming back) on focus */
-  .search-input, .note-input { font-size: 1rem; }
+  .search-input { font-size: 1rem; }
+  /* notes read smaller everywhere except iOS, where any field under 16px
+     triggers the stuck auto-zoom on focus — hold ALL fields at 1rem there
+     (fb- = feedback sheet, ed- = spot editor, adm- = team sheet) */
+  .note-input { font-size: 0.875rem; }
+  @supports (-webkit-touch-callout: none) {
+    .note-input, .fb-textarea, .fb-input,
+    .ed-input, .ed-textarea, .ed-tag-input,
+    .adm-promote > input { font-size: 1rem; }
+  }
 
   /* fields match the glass panel: translucent bg, but text stays dark + legible */
   .filters-collapse .search-input,
@@ -826,10 +836,14 @@ a.spot-cover:hover { filter: brightness(1.06); }
     display: flex; flex-direction: column; align-items: stretch;
     gap: 9px; padding: 15px 16px 11px;
   }
-  .vt-place { font-size: 1rem; padding-right: 26px; }
+  /* stacked card: name clearly leads the hierarchy */
+  .vt-row .vt-place { font-size: 1.125rem; font-weight: 600; padding-right: 26px; }
   .vt-meta {
     display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px;
   }
+  .vt-meta .vt-c-area { font-weight: 600; }
+  .vt-meta .vt-c-price { font-size: 0.8125rem; color: var(--muted); }
+  .vt-meta .vt-c-date { font-size: 0.7188rem; }
   .vt-remove { position: absolute; top: 11px; right: 9px; }
 
   /* one slider per row, label sitting above its track */
