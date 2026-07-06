@@ -791,6 +791,18 @@ a.spot-cover:hover { filter: brightness(1.06); }
   /* portrait TikTok thumbnails — give them real height on phones */
   .spot-cover { height: clamp(360px, 52vh, 520px); background-position: center 22%; border-right: none; border-bottom: 1px solid var(--line); order: 0; }
   .spot-left { order: 1; }
+  /* smaller title on phones so name + New badge stay on one line, with the
+     rest of the card's type scaled to keep the same hierarchy */
+  .spot-name { font-size: 1.3rem; }
+  .spot-loc { font-size: 0.8125rem; }
+  .spot-summary { font-size: 0.875rem; }
+  .been-btn, .action-btn { font-size: 0.7812rem; }
+  .tag { font-size: 0.75rem; }
+  .meta-label { font-size: 0.6875rem; }
+  .meta-sub { font-size: 0.75rem; }
+  .rating-num, .price-dots { font-size: 1rem; }
+  .price-val { font-size: 0.9375rem; }
+  .bd-label, .bd-num { font-size: 0.7188rem; }
   .spot-right { min-height: 300px; border-left: none; border-top: 1px solid var(--line); order: 2; }
   /* brand (+ its count) on the left, auth control alone on the top-right */
   .topbar { align-items: flex-start; gap: 12px; }
