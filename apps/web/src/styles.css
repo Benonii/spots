@@ -1303,3 +1303,134 @@ body .sl-footer a:hover { color: var(--ink-soft); }
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
   font-size: 0.6875rem; font-weight: 700; color: #fffefb; background: var(--accent-text);
 }
+
+/* ── Spot Matches ─────────────────────────────────────────────────────────
+   opt-in people matching: header launcher, the modal, and the per-spot strip */
+
+/* header launcher (sits beside Near me / auth) */
+.matches-link {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 34px; height: 34px; cursor: pointer;
+  color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.matches-link:hover { color: var(--accent-text); border-color: var(--accent-line); transform: translateY(-1px); }
+.matches-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--serif-b); font-size: 0.625rem; font-weight: 700; line-height: 1;
+  color: #fffefb; background: var(--accent); border-radius: 999px; border: 1.5px solid var(--bg);
+}
+
+/* modal (reuses .ed-scrim / .ed-panel chrome) */
+/* the crossed-out "spot" in the eyebrow: lighter orange so the correction
+   reads at a glance */
+.ed-eyebrow s {
+  color: color-mix(in oklab, var(--accent-text) 55%, var(--bg));
+  text-decoration-thickness: 1px;
+}
+.mt-lede { margin: 0; font-size: 0.9375rem; line-height: 1.55; color: var(--ink-soft); text-wrap: pretty; }
+.mt-lede em { font-style: normal; font-weight: 700; color: var(--ink); }
+.mt-optin { display: flex; flex-direction: column; gap: 14px; }
+
+.mt-seg { display: flex; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.mt-seg-btn {
+  flex: 1; font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; cursor: pointer;
+  color: var(--ink-soft); background: transparent; border: 0; border-radius: 9px; padding: 8px 6px;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.mt-seg-btn:hover { color: var(--ink); }
+.mt-seg-btn.on { color: #fffefb; background: var(--primary); }
+
+.mt-input { font-size: 0.9375rem; }
+.mt-fineprint { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
+
+.mt-actions { display: flex; align-items: center; gap: 10px; }
+.mt-primary {
+  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 700; cursor: pointer;
+  color: #fffefb; background: var(--primary); border: 1px solid var(--primary);
+  border-radius: 11px; padding: 10px 20px; transition: filter 0.14s ease, transform 0.1s ease;
+}
+.mt-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.mt-primary:disabled { opacity: 0.55; cursor: default; }
+.mt-ghost { font-family: var(--serif-b); font-size: 0.875rem; font-weight: 600; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 8px 6px; }
+.mt-ghost:hover { color: var(--ink); }
+
+.mt-status { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); }
+.mt-switch { display: inline-flex; align-items: center; gap: 9px; font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+.mt-switch input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.mt-linkbtn { align-self: flex-start; font-family: var(--serif-b); font-size: 0.8125rem; color: var(--accent-text); background: none; border: 0; cursor: pointer; padding: 0; text-transform: capitalize; }
+.mt-linkbtn:hover { text-decoration: underline; }
+
+.mt-empty { text-align: left; }
+.mt-empty p { margin: 0; font-family: var(--serif-d); font-size: 1rem; color: var(--ink); }
+.mt-empty-sub { margin-top: 6px !important; font-family: var(--serif-b) !important; font-size: 0.875rem !important; color: var(--muted) !important; line-height: 1.5; text-wrap: pretty; }
+
+.mt-matches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.mt-match { display: flex; align-items: center; gap: 11px; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); }
+.mt-match:last-child { border-bottom: 0; }
+.mt-match-main { display: flex; flex-direction: column; min-width: 0; }
+.mt-match-name { font-family: var(--serif-d); font-size: 0.9375rem; font-weight: 600; color: var(--ink); }
+.mt-match-sub { font-size: 0.75rem; color: var(--muted); }
+.mt-contact {
+  margin-left: auto; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; color: var(--accent-text); text-decoration: none;
+  background: var(--accent-wash); border: 1px solid var(--accent-line); border-radius: 999px; padding: 5px 13px;
+}
+.mt-contact:hover { text-decoration: underline; }
+
+.mt-leave { align-self: flex-start; margin-top: 4px; font-family: var(--serif-b); font-size: 0.8125rem; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.mt-leave:hover:not(:disabled) { color: var(--accent-text); }
+.mt-leave:disabled { opacity: 0.5; cursor: default; }
+
+/* per-spot strip under a saved card */
+.sm-invite {
+  display: flex; align-items: center; gap: 8px; margin-top: 14px; width: 100%;
+  color: var(--accent-text); background: var(--accent-wash); border: 1px dashed var(--accent-line);
+  border-radius: 12px; padding: 10px 13px; transition: background 0.14s ease;
+}
+.sm-invite:hover { background: color-mix(in oklab, var(--accent-wash) 60%, var(--accent) 12%); }
+.sm-invite-cta {
+  display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; text-align: left; cursor: pointer;
+  color: inherit; background: none; border: 0; padding: 0;
+}
+.sm-invite-cta svg { flex: none; }
+.sm-invite-x {
+  flex: none; cursor: pointer; color: var(--accent-text); opacity: 0.7;
+  background: none; border: 0; font-size: 1.05rem; line-height: 1; padding: 2px 4px;
+  transition: opacity 0.14s ease;
+}
+.sm-invite-x:hover { opacity: 1; }
+
+.sm-wrap { margin-top: 16px; padding: 13px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.sm-head { font-family: var(--serif-b); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-text); margin-bottom: 10px; }
+.sm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.sm-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.sm-who { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.sm-name { font-family: var(--serif-d); font-size: 0.9063rem; font-weight: 600; color: var(--ink); }
+.sm-sub { font-size: 0.7188rem; color: var(--muted); }
+.sm-like {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font-family: var(--serif-b); font-size: 0.7812rem; font-weight: 600; cursor: pointer;
+  color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.sm-like:hover { color: var(--accent-text); border-color: var(--accent-line); }
+.sm-like.on { color: #fffefb; background: var(--accent); border-color: var(--accent); }
+.sm-like svg { flex: none; }
+.sm-hide { flex: none; font-family: var(--serif-b); font-size: 0.7188rem; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 2px; }
+.sm-hide:hover { color: var(--accent-text); }
+.sm-more { margin-top: 8px; font-family: var(--serif-b); font-size: 0.7812rem; font-weight: 600; color: var(--accent-text); background: none; border: 0; cursor: pointer; padding: 2px 0; }
+
+@media (max-width: 900px) {
+  .sm-name { font-size: 0.875rem; }
+  .mt-match-name { font-size: 0.9063rem; }
+  .mt-contact { max-width: 42%; }
+}
+
+/* full "wants to go here too" list inside the sheet: roomier rows + dividers */
+.sm-list-sheet { gap: 0; }
+.sm-list-sheet .sm-row { padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+.sm-list-sheet .sm-row:last-child { border-bottom: 0; }

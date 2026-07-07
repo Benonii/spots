@@ -5,6 +5,7 @@ import { isNewSpot } from "../lib/categories";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
+import { SpotMatches } from "./SpotMatches";
 
 const SWIPED_KEY = "spots:swiped";
 
@@ -208,6 +209,9 @@ export function SpotCard({
   isSaved,
   onToggleSaved,
   showBreakdown = true,
+  optedIn = false,
+  onNeedOptIn,
+  onLiked,
 }: {
   spot: Spot;
   index: number;
@@ -219,6 +223,10 @@ export function SpotCard({
   isSaved: boolean;
   onToggleSaved: () => void;
   showBreakdown?: boolean;
+  /** Spot Matches: whether the viewer has opted in, and the wiring for it. */
+  optedIn?: boolean;
+  onNeedOptIn?: () => void;
+  onLiked?: () => void;
 }) {
   const stars = spot.quality_score / 20;
   const dims = spot.quality_signals.dimensions;
@@ -406,6 +414,16 @@ export function SpotCard({
             <BookmarkIcon filled={isSaved} /> {isSaved ? "Saved" : "Save"}
           </button>
         </div>
+
+        {isSaved && onNeedOptIn && onLiked && (
+          <SpotMatches
+            placeId={spot.google_place_id}
+            spotName={spot.name}
+            optedIn={optedIn}
+            onNeedOptIn={onNeedOptIn}
+            onLiked={onLiked}
+          />
+        )}
 
         {spot.summary && <p className="spot-summary">{spot.summary}</p>}
 

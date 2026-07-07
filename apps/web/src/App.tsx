@@ -16,6 +16,14 @@ import {
 } from "./lib/visits";
 import { upsertProfile } from "./lib/profiles";
 import { addSaved, fetchSaved, removeSaved } from "./lib/saved";
+import {
+  fetchOptIn,
+  fetchMatches,
+  saveOptIn as saveOptInApi,
+  leaveDating,
+  type Match,
+  type OptIn,
+} from "./lib/dating";
 import { areaTier } from "./lib/areas";
 import { CATEGORIES, isNewSpot, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
@@ -31,6 +39,7 @@ import { Tooltip } from "./components/Tooltip";
 import { SpotEditor } from "./components/SpotEditor";
 import { TeamSheet } from "./components/TeamSheet";
 import { AdminMenu } from "./components/AdminMenu";
+import { MatchesModal } from "./components/MatchesModal";
 
 const PRICE_OPTIONS: Option[] = [
   { value: "any", label: "Any price" },
@@ -73,6 +82,15 @@ function NearIcon() {
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z" />
       <circle cx="12" cy="10.5" r="2.3" />
+    </svg>
+  );
+}
+
+function MatchesIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20s-6.5-5.3-6.5-10A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 6.5 3c0 4.7-6.5 10-6.5 10z" />
     </svg>
   );
 }
@@ -147,6 +165,14 @@ export function App() {
     null,
   );
   const [teamOpen, setTeamOpen] = useState(false);
+
+  // ── Spot Matches (opt-in people matching) ──────────────────────────────────
+  const [optIn, setOptIn] = useState<OptIn | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [matchesOpen, setMatchesOpen] = useState(false);
+  // per-user "last saw the matches list" stamp; loaded from localStorage in the
+  // session effect (keyed by uid — accounts sharing a browser must not bleed)
+  const [matchesSeenAt, setMatchesSeenAt] = useState(0);
   // admins can flip the carousel into a review queue of hidden draft spots
   const [showDrafts, setShowDrafts] = useState(false);
 
@@ -200,8 +226,15 @@ export function App() {
       setSaved(new Set());
       setCommunity([]);
       setRole(null);
+      setOptIn(null);
+      setMatches([]);
+      setMatchesSeenAt(0);
       return;
     }
+    // Guard against out-of-order resolution: if the user switches (or signs
+    // out) while these are in flight, the previous account's responses must
+    // not land in the new session's state — matches carry revealed contacts.
+    let live = true;
     void fetchMyRole(user.id).then(setRole).catch(() => setRole("user"));
     void upsertProfile(user).catch(() => {}); // best-effort; don't block the log
     fetchVisits(user.id)
@@ -216,7 +249,70 @@ export function App() {
     fetchCommunityVisits()
       .then(setCommunity)
       .catch((e) => console.warn("community feed unavailable:", e));
+    // Spot Matches: load opt-in state, then confirmed matches if discoverable.
+    // Non-critical — never block the log.
+    try {
+      const seen = Number(localStorage.getItem(`spots:matchesSeen:${user.id}`));
+      setMatchesSeenAt(Number.isFinite(seen) ? seen : 0);
+    } catch {
+      setMatchesSeenAt(0);
+    }
+    fetchOptIn(user.id)
+      .then((oi) => {
+        if (!live) return;
+        setOptIn(oi);
+        if (oi?.active)
+          fetchMatches()
+            .then((m) => live && setMatches(m))
+            .catch(() => {});
+      })
+      .catch((e) => console.warn("matches unavailable:", e));
+    return () => {
+      live = false;
+    };
   }, [user, reportWriteError]);
+
+  // Spot Matches handlers. saveOptIn/leave refresh the confirmed-match list so
+  // the badge and modal stay in sync; a fresh like may complete a mutual match.
+  const handleSaveOptIn = useCallback(async (o: OptIn) => {
+    await saveOptInApi(o);
+    setOptIn(o);
+    // refresh matches best-effort: a fetch failure must not read as "save
+    // failed" back in the modal (the opt-in row IS saved at this point)
+    if (o.active) fetchMatches().then(setMatches).catch(() => {});
+    else setMatches([]);
+  }, []);
+  const handleLeaveDating = useCallback(async () => {
+    await leaveDating();
+    setOptIn(null);
+    setMatches([]);
+  }, []);
+  const refetchMatches = useCallback(() => {
+    if (optIn?.active) fetchMatches().then(setMatches).catch(() => {});
+  }, [optIn?.active]);
+  // refetch on open (a peer may have liked back since sign-in); stamp "seen"
+  // only on close, so matches that load while the panel is open still count
+  // as seen and ones that never rendered don't get silently marked.
+  const openMatches = useCallback(() => {
+    setMatchesOpen(true);
+    refetchMatches();
+  }, [refetchMatches]);
+  const closeMatches = useCallback(() => {
+    setMatchesOpen(false);
+    const now = Date.now();
+    setMatchesSeenAt(now);
+    if (user) {
+      try {
+        localStorage.setItem(`spots:matchesSeen:${user.id}`, String(now));
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [user]);
+  const unreadMatches = useMemo(
+    () => matches.filter((m) => new Date(m.matchedAt).getTime() > matchesSeenAt).length,
+    [matches, matchesSeenAt],
+  );
 
   // show a *random* spot on every page load (not just the first), once spots arrive
   const pickedRandom = useRef(false);
@@ -631,6 +727,22 @@ export function App() {
               <span className="near-link-label">Near me</span>
             </Link>
           </Tooltip>
+          {user && (
+            <Tooltip label="Matches">
+              <button
+                className="matches-link"
+                onClick={openMatches}
+                aria-label={unreadMatches > 0 ? `Matches, ${unreadMatches} new` : "Matches"}
+              >
+                <MatchesIcon />
+                {unreadMatches > 0 && (
+                  <span className="matches-badge" aria-hidden="true">
+                    {unreadMatches}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+          )}
           {isAdmin && (
             <AdminMenu
               isSuper={role === "super"}
@@ -749,6 +861,9 @@ export function App() {
             onToggleVisited={toggleVisited}
             isSaved={isSaved}
             onToggleSaved={toggleSaved}
+            optedIn={!!optIn?.active}
+            onNeedOptIn={openMatches}
+            onLiked={refetchMatches}
           />
         </div>
       ) : (
@@ -893,6 +1008,16 @@ export function App() {
       )}
 
       {teamOpen && user && <TeamSheet meId={user.id} onClose={() => setTeamOpen(false)} />}
+
+      {matchesOpen && user && (
+        <MatchesModal
+          optIn={optIn}
+          matches={matches}
+          onClose={closeMatches}
+          onSave={handleSaveOptIn}
+          onLeave={handleLeaveDating}
+        />
+      )}
     </div>
   );
 }
