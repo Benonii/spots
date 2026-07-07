@@ -113,6 +113,34 @@
       "when": 1782471800000,
       "tag": "0015_search_profiles_by_email",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782471900000,
+      "tag": "0016_spot_matches",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782472000000,
+      "tag": "0017_spot_matches_left_join",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782472100000,
+      "tag": "0018_profiles_trigger",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782472200000,
+      "tag": "0019_spot_matches_hardening",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,7 @@ import {
   uniqueIndex,
   check,
   pgPolicy,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { anonRole, authenticatedRole } from "drizzle-orm/supabase";
 
@@ -411,6 +412,148 @@ export const savedSpots = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* dating_opt_in — spot-matching opt-in + contact channel (private)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One row per user who has opted into spot-based people matching. Holds the
+ * single contact channel that is revealed ONLY ON A MUTUAL MATCH. Deny-by-
+ * default: the policies below grant a user access to THEIR OWN row and nothing
+ * else, so another user's `contact_value` is unreadable to the `authenticated`
+ * role through the API. A matched peer's contact is emitted solely by the
+ * SECURITY DEFINER `my_matches()` function (see migration), which requires likes
+ * in both directions and no block either way. `active` gates discoverability:
+ * setting it false removes the user from everyone's matches immediately without
+ * discarding their saved contact.
+ */
+export const datingOptIn = pgTable(
+  "dating_opt_in",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .default(sql`(auth.uid())::text`), // = auth.uid(), -> profiles.id
+    contactType: text("contact_type").notNull(),
+    contactValue: text("contact_value").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "dating_contact_type_check",
+      sql`${t.contactType} in ('email','telegram','instagram')`,
+    ),
+    // Own row only — no cross-user select. Other users' contact info is thus
+    // invisible to `authenticated`; only my_matches() (DEFINER) emits it, and
+    // only for a mutual match.
+    pgPolicy("read own opt-in", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+    pgPolicy("insert own opt-in", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+    pgPolicy("update own opt-in", {
+      for: "update",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
+      withCheck: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+    pgPolicy("delete own opt-in", {
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.userId}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* likes — one-directional interest; mutual = a match                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A like row means the caller wants to match with `to_user`. There is no
+ * separate "request" vs "accept" — a match is simply two like rows in opposite
+ * directions. CRUCIALLY the select policy exposes only OUTGOING likes
+ * (`from_user = auth.uid()`); a user cannot see who has liked them. Mutual
+ * detection happens only inside the DEFINER `my_matches()`, which keeps v1
+ * mutual-only. Unlike = delete your own row.
+ */
+export const likes = pgTable(
+  "likes",
+  {
+    fromUser: text("from_user")
+      .notNull()
+      .default(sql`(auth.uid())::text`),
+    toUser: text("to_user").notNull(), // -> profiles.id
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.fromUser, t.toUser] }),
+    index("likes_to_user_idx").on(t.toUser), // reverse lookup in my_matches()
+    check("likes_no_self_check", sql`${t.fromUser} <> ${t.toUser}`),
+    pgPolicy("insert own like", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`(select auth.uid())::text = ${t.fromUser}`,
+    }),
+    pgPolicy("delete own like", {
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.fromUser}`,
+    }),
+    // OUTGOING ONLY. Incoming likes stay invisible; my_matches() (DEFINER) is
+    // the sole path that reads both directions.
+    pgPolicy("read own outgoing likes", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.fromUser}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* blocks — hide two users from each other in matching                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `blocker` no longer wants to see or be seen by `blocked`. Both
+ * matches_for_spot() and my_matches() exclude any pair with a block row in
+ * EITHER direction, so a block is effectively mutual invisibility. A user reads,
+ * creates, and removes only their own block rows.
+ */
+export const blocks = pgTable(
+  "blocks",
+  {
+    blocker: text("blocker")
+      .notNull()
+      .default(sql`(auth.uid())::text`),
+    blocked: text("blocked").notNull(), // -> profiles.id
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.blocker, t.blocked] }),
+    pgPolicy("manage own blocks", {
+      for: "all",
+      to: authenticatedRole,
+      using: sql`(select auth.uid())::text = ${t.blocker}`,
+      withCheck: sql`(select auth.uid())::text = ${t.blocker}`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* feedback — bug reports, feature requests, general notes from anyone   */
 /* ------------------------------------------------------------------ */
 
@@ -638,3 +781,12 @@ export type NewAnalyticsEvent = typeof events.$inferInsert;
 
 export type SuppressedPlace = typeof suppressedPlaces.$inferSelect;
 export type NewSuppressedPlace = typeof suppressedPlaces.$inferInsert;
+
+export type DatingOptIn = typeof datingOptIn.$inferSelect;
+export type NewDatingOptIn = typeof datingOptIn.$inferInsert;
+
+export type Like = typeof likes.$inferSelect;
+export type NewLike = typeof likes.$inferInsert;
+
+export type Block = typeof blocks.$inferSelect;
+export type NewBlock = typeof blocks.$inferInsert;
