@@ -176,7 +176,7 @@ export function MatchesModal({
             <div className="mt-optin">
               <p className="mt-lede">
                 Match with people who want to go to the same spots. You'll only see
-                each other's contact when you've <em>both</em> liked — nothing before that.
+                their contact when you've <em>both</em> liked each other — nothing before that.
               </p>
               <div className="mt-seg" role="group" aria-label="Contact channel">
                 {CHANNELS.map((c) => (
