@@ -208,6 +208,27 @@ export function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Fire `match_new` once per distinct mutual match (keyed by peer id in
+  // localStorage). Without the dedup it would re-fire every page load for the
+  // same match; the client has no other "a match just happened" signal.
+  const reportNewMatches = useCallback((list: Match[], uid: string) => {
+    try {
+      const key = `spots:matchReported:${uid}`;
+      const seen = new Set<string>(JSON.parse(localStorage.getItem(key) ?? "[]"));
+      let changed = false;
+      for (const m of list) {
+        if (!seen.has(m.userId)) {
+          seen.add(m.userId);
+          changed = true;
+          void track("match_new");
+        }
+      }
+      if (changed) localStorage.setItem(key, JSON.stringify([...seen]));
+    } catch {
+      /* analytics must never disrupt the app */
+    }
+  }, []);
+
   // load the signed-in user's own log (importing any legacy localStorage log
   // once) plus everyone's public reviews; mirror their Google profile so their
   // reviews show a name + avatar. All cleared when signed out.
@@ -254,37 +275,59 @@ export function App() {
         setOptIn(oi);
         if (oi?.active)
           fetchMatches()
-            .then((m) => live && setMatches(m))
+            .then((m) => {
+              if (!live) return;
+              setMatches(m);
+              reportNewMatches(m, user.id);
+            })
             .catch(() => {});
       })
       .catch((e) => console.warn("matches unavailable:", e));
     return () => {
       live = false;
     };
-  }, [user, reportWriteError]);
+  }, [user, reportWriteError, reportNewMatches]);
 
   // Spot Matches handlers. saveOptIn/leave refresh the confirmed-match list so
   // the badge and modal stay in sync; a fresh like may complete a mutual match.
-  const handleSaveOptIn = useCallback(async (o: OptIn) => {
-    await saveOptInApi(o);
-    setOptIn(o);
-    // refresh matches best-effort: a fetch failure must not read as "save
-    // failed" back in the modal (the opt-in row IS saved at this point)
-    if (o.active) fetchMatches().then(setMatches).catch(() => {});
-    else setMatches([]);
-  }, []);
+  const handleSaveOptIn = useCallback(
+    async (o: OptIn) => {
+      const firstTime = !optIn; // no prior row => this is a fresh opt-in
+      await saveOptInApi(o);
+      if (firstTime) void track("matches_opt_in");
+      setOptIn(o);
+      // refresh matches best-effort: a fetch failure must not read as "save
+      // failed" back in the modal (the opt-in row IS saved at this point)
+      if (o.active && user)
+        fetchMatches()
+          .then((m) => {
+            setMatches(m);
+            reportNewMatches(m, user.id);
+          })
+          .catch(() => {});
+      else setMatches([]);
+    },
+    [optIn, user, reportNewMatches],
+  );
   const handleLeaveDating = useCallback(async () => {
     await leaveDating();
     setOptIn(null);
     setMatches([]);
   }, []);
   const refetchMatches = useCallback(() => {
-    if (optIn?.active) fetchMatches().then(setMatches).catch(() => {});
-  }, [optIn?.active]);
+    if (optIn?.active && user)
+      fetchMatches()
+        .then((m) => {
+          setMatches(m);
+          reportNewMatches(m, user.id);
+        })
+        .catch(() => {});
+  }, [optIn?.active, user, reportNewMatches]);
   // refetch on open (a peer may have liked back since sign-in); stamp "seen"
   // only on close, so matches that load while the panel is open still count
   // as seen and ones that never rendered don't get silently marked.
   const openMatches = useCallback(() => {
+    void track("matches_open");
     setMatchesOpen(true);
     refetchMatches();
   }, [refetchMatches]);
@@ -713,7 +756,12 @@ export function App() {
             {spots.length} places{user ? ` · ${visited.length} visited` : ""}
           </div>
           <Tooltip label="Near me">
-            <Link to="/near" className="near-link" aria-label="Near me">
+            <Link
+              to="/near"
+              className="near-link"
+              aria-label="Near me"
+              onClick={() => void track("near_open")}
+            >
               <NearIcon />
               <span className="near-link-label">Near me</span>
             </Link>

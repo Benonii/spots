@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ContactType, Match, OptIn } from "../lib/dating";
+import { track } from "../lib/analytics";
 
 /**
  * The opt-in + matches surface. Reuses the editor sheet chrome
@@ -40,7 +41,13 @@ function MatchRow({ m }: { m: Match }) {
           {m.overlapCount} shared {m.overlapCount === 1 ? "place" : "places"}
         </span>
       </div>
-      <a className="mt-contact" href={contactHref(m.contactType, m.contactValue)} target="_blank" rel="noreferrer">
+      <a
+        className="mt-contact"
+        href={contactHref(m.contactType, m.contactValue)}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => void track("match_contact_click", { contactType: m.contactType })}
+      >
         {m.contactType === "email" ? m.contactValue : "@" + m.contactValue.replace(/^@/, "")}
       </a>
     </li>

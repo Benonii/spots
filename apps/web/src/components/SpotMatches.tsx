@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { block, like, matchesForSpot, unlike, type SpotMatch } from "../lib/dating";
+import { track } from "../lib/analytics";
 
 /**
  * "Who else wants to go here" — rendered under a saved spot. Shows other opted-in
@@ -114,7 +115,10 @@ export function SpotMatches({
     });
     try {
       on ? await unlike(p.userId) : await like(p.userId);
-      if (!on) onLiked(); // a reciprocal like may have just become a match
+      if (!on) {
+        void track("match_like", { placeId });
+        onLiked(); // a reciprocal like may have just become a match
+      }
     } catch {
       // roll back only if we're still on the same spot — after a swipe the
       // liked set has been rebuilt from the new spot's rows
