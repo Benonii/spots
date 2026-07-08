@@ -156,7 +156,10 @@ export function MatchesModal({
             <p className="ed-eyebrow">
               Find the perfect <s>spot</s> person
             </p>
-            <h2 id={titleId}>Matches</h2>
+            <h2 id={titleId}>
+              Matches{" "}
+              <span className="tag-new tag-beta">Beta</span>
+            </h2>
           </div>
           <button className="ed-x" type="button" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"

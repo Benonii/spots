@@ -86,15 +86,6 @@ function NearIcon() {
   );
 }
 
-function MatchesIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20s-6.5-5.3-6.5-10A3.5 3.5 0 0 1 12 7a3.5 3.5 0 0 1 6.5 3c0 4.7-6.5 10-6.5 10z" />
-    </svg>
-  );
-}
-
 function PencilIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -727,22 +718,6 @@ export function App() {
               <span className="near-link-label">Near me</span>
             </Link>
           </Tooltip>
-          {user && (
-            <Tooltip label="Matches">
-              <button
-                className="matches-link"
-                onClick={openMatches}
-                aria-label={unreadMatches > 0 ? `Matches, ${unreadMatches} new` : "Matches"}
-              >
-                <MatchesIcon />
-                {unreadMatches > 0 && (
-                  <span className="matches-badge" aria-hidden="true">
-                    {unreadMatches}
-                  </span>
-                )}
-              </button>
-            </Tooltip>
-          )}
           {isAdmin && (
             <AdminMenu
               isSuper={role === "super"}
@@ -753,7 +728,14 @@ export function App() {
               onOpenTeam={() => setTeamOpen(true)}
             />
           )}
-          <AuthButton user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
+          <AuthButton
+            user={user}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+            onOpenMatches={openMatches}
+            unreadMatches={unreadMatches}
+            optedIn={!!optIn?.active}
+          />
         </div>
       </header>
 

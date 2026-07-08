@@ -150,49 +150,88 @@ body {
 .auth-user { position: relative; display: inline-flex; align-items: center; gap: 9px; }
 .auth-trigger {
   display: inline-flex; align-items: center; gap: 9px;
-  background: none; border: 0; padding: 0; border-radius: 999px; cursor: default;
+  background: none; border: 0; padding: 3px; border-radius: 999px; cursor: pointer;
+  transition: background 0.15s ease;
 }
+.auth-trigger:hover { background: var(--press); }
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
+.auth-avatar-wrap { position: relative; display: inline-flex; flex: none; }
+/* unread-matches signal on the avatar itself — the menu hides the count, the
+   dot keeps the invitation visible at a glance */
+.auth-dot {
+  position: absolute; top: -1px; right: -1px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--accent); border: 1.5px solid var(--bg);
+}
 .auth-avatar-fallback {
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--primary); color: #fff; font-size: 0.8438rem; font-family: var(--serif-d);
 }
 .auth-name { font-size: 0.8438rem; color: var(--ink); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* normal screens: the visible inline Sign out (original behaviour) */
-.auth-signout-inline {
-  font-family: var(--serif-b); font-size: 0.75rem; color: var(--muted); cursor: pointer;
-  background: none; border: none; padding: 4px 2px; text-decoration: underline;
-  text-underline-offset: 2px; transition: color 0.15s ease;
-}
-.auth-signout-inline:hover { color: var(--accent-text); }
-
-/* the popover is used ONLY on very narrow screens (see the <420px block) */
+/* account menu (all widths) — same chrome as the admin menu */
 .auth-pop {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
-  min-width: 180px; display: none; flex-direction: column; gap: 2px;
+  min-width: 190px; display: none; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
   padding: 6px; box-shadow: 0 12px 34px rgba(44, 66, 50, 0.16);
   animation: admin-pop-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.auth-user.open .auth-pop { display: flex; }
 .auth-pop-name {
   font-size: 0.8125rem; color: var(--muted); padding: 7px 11px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-bottom: 1px solid var(--line-soft); margin-bottom: 4px;
 }
-.auth-signout {
-  display: flex; width: 100%; cursor: pointer; text-align: left;
-  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink);
-  background: none; border: 0; border-radius: 8px; padding: 9px 11px;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.auth-signout:hover { background: var(--press); color: var(--accent-text); }
 
-/* under 420px: hide the inline button, tuck Sign out under the avatar */
-@media (max-width: 419px) {
-  .auth-trigger { cursor: pointer; padding: 3px; transition: background 0.15s ease; }
-  .auth-trigger:hover { background: var(--press); }
-  .auth-signout-inline { display: none; }
-  .auth-user.open .auth-pop { display: flex; }
+/* ── the matchstick (Tamada, Noun Project) ─────────────────────────────
+   One-path linework artwork. Base is ink; opting in reveals an orange copy
+   clipped to the flame + ember head. All motion lives in the flame alone:
+   lit + hover = flicker; unlit + hover = a faint ignition preview teasing
+   the opt-in. Opacity only — a transform would expose the ink copy
+   underneath. stroke fattens the thin linework so it survives 22px. */
+.match-icon { flex: none; overflow: visible; }
+.signout-icon { flex: none; color: var(--ink-soft); }
+/* sign-out: the arrow leans toward the door on row hover */
+.signout-icon .so-arrow { transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1); }
+.admin-item:hover .signout-icon .so-arrow { transform: translateX(1.6px); }
+.match-icon .match-base { fill: var(--ink-soft); stroke: var(--ink-soft); stroke-width: 2; }
+.match-icon .match-base path { transition: opacity 0.2s ease; }
+.match-icon .match-flame {
+  opacity: 0; transition: opacity 0.25s ease;
+  /* sway pivots at the head. The motion is small enough that the ink copy
+     underneath never peeks past sub-pixel. */
+  transform-box: fill-box; transform-origin: 66% 54%;
+}
+.match-icon .match-flame path {
+  fill: var(--accent-text); stroke: var(--accent-text); stroke-width: 2;
+  transform-box: fill-box; transform-origin: 66% 58%;
+}
+/* unlit: same flame, ink — it only ever shows on hover */
+.match-icon:not(.lit) .match-flame path { fill: var(--ink-soft); stroke: var(--ink-soft); }
+.match-icon.lit .match-flame { opacity: 1; }
+/* whenever the overlay owns the flame (lit, or hover on either state), hide
+   the identical ink copy underneath — that frees the waver from sub-pixel
+   amplitudes: nothing static peeks out behind the moving flame */
+.match-icon.lit .match-base path,
+.admin-item:hover .match-icon .match-base path { opacity: 0; }
+.admin-item:hover .match-icon .match-flame {
+  opacity: 1;
+  animation: flame-sway 1.3s ease-in-out infinite;
+}
+.admin-item:hover .match-icon .match-flame path { animation: flame-lick 0.7s ease-in-out infinite; }
+/* real fire doesn't loop: two motions at non-harmonic periods (1.3s sway on
+   the group, 0.7s lick on the path) beat against each other, so the combined
+   pattern only repeats every ~9s */
+@keyframes flame-sway {
+  0%, 100% { transform: none; }
+  35% { transform: rotate(-6.5deg); }
+  70% { transform: rotate(4.5deg); }
+}
+@keyframes flame-lick {
+  0%, 100% { transform: none; opacity: 1; }
+  28% { transform: scale(1.06, 0.91) translateX(0.6px); opacity: 0.88; }
+  56% { transform: scale(0.94, 1.1) translateY(-1px); opacity: 1; }
+  82% { transform: scale(1.04, 0.96) translateX(-0.4px); opacity: 0.92; }
 }
 
 /* ---------- controls ---------- */
@@ -347,6 +386,12 @@ a.spot-cover:hover { filter: brightness(1.06); }
   letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--accent-text); background: transparent; border: 1px dashed var(--accent-text);
 }
+/* Beta marker: same dashed-accent badge, compact for the account-menu row and
+   the modal eyebrow (reset the inline-context margin/baseline nudge) */
+.tag-beta { margin-left: 7px; padding: 2px 7px; vertical-align: baseline; font-size: 0.5625rem; }
+.admin-item .tag-beta { margin-left: 0; }
+/* in the modal title, solid border + optical centre against the large heading */
+.ed-head h2 .tag-beta { border-style: solid; vertical-align: 4px; }
 
 .spot-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
 .meta-block { min-width: 0; }
@@ -1305,23 +1350,8 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 }
 
 /* ── Spot Matches ─────────────────────────────────────────────────────────
-   opt-in people matching: header launcher, the modal, and the per-spot strip */
-
-/* header launcher (sits beside Near me / auth) */
-.matches-link {
-  position: relative; display: inline-flex; align-items: center; justify-content: center;
-  flex: none; width: 34px; height: 34px; cursor: pointer;
-  color: var(--ink-soft); background: var(--surface-2);
-  border: 1px solid var(--line); border-radius: 999px;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-.matches-link:hover { color: var(--accent-text); border-color: var(--accent-line); transform: translateY(-1px); }
-.matches-badge {
-  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-family: var(--serif-b); font-size: 0.625rem; font-weight: 700; line-height: 1;
-  color: #fffefb; background: var(--accent); border-radius: 999px; border: 1.5px solid var(--bg);
-}
+   opt-in people matching: the modal and the per-spot strip (the launcher
+   lives in the account menu — see .auth-pop / .match-icon above) */
 
 /* modal (reuses .ed-scrim / .ed-panel chrome) */
 /* the crossed-out "spot" in the eyebrow: lighter orange so the correction
