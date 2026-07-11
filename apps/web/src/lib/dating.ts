@@ -37,6 +37,9 @@ export type Match = {
   contactType: ContactType;
   contactValue: string;
   overlapCount: number;
+  /** Names of the spots both saved, best-first (may be empty if a shared spot
+   * was later unsaved or hidden). */
+  sharedSpots: string[];
   matchedAt: string;
 };
 
@@ -108,6 +111,7 @@ export async function fetchMatches(): Promise<Match[]> {
     contactType: r.contact_type as ContactType,
     contactValue: String(r.contact_value),
     overlapCount: Number(r.overlap_count ?? 0),
+    sharedSpots: Array.isArray(r.shared_spots) ? r.shared_spots.map(String) : [],
     matchedAt: String(r.matched_at),
   }));
 }

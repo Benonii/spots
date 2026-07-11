@@ -27,6 +27,26 @@ function contactHref(type: ContactType, value: string): string {
   return `mailto:${value.trim()}`;
 }
 
+/** "also wants to go to <b>A</b> and <b>B</b> (and N more)" — at most two names
+ * spelled out, the rest summarised so a long overlap can't blow out the row. */
+function SharedSpots({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  const shown = names.slice(0, 2);
+  const rest = names.length - shown.length;
+  return (
+    <span className="mt-match-sub">
+      also wants to go to{" "}
+      {shown.map((n, i) => (
+        <span key={n}>
+          {i > 0 && (rest === 0 ? " and " : ", ")}
+          <b>{n}</b>
+        </span>
+      ))}
+      {rest > 0 && <span className="mt-match-more"> (and {rest} more)</span>}
+    </span>
+  );
+}
+
 function MatchRow({ m }: { m: Match }) {
   return (
     <li className="mt-match">
@@ -37,9 +57,7 @@ function MatchRow({ m }: { m: Match }) {
       )}
       <div className="mt-match-main">
         <span className="mt-match-name">{firstName(m.displayName)}</span>
-        <span className="mt-match-sub">
-          {m.overlapCount} shared {m.overlapCount === 1 ? "place" : "places"}
-        </span>
+        <SharedSpots names={m.sharedSpots} />
       </div>
       <a
         className="mt-contact"
