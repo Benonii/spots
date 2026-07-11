@@ -150,49 +150,88 @@ body {
 .auth-user { position: relative; display: inline-flex; align-items: center; gap: 9px; }
 .auth-trigger {
   display: inline-flex; align-items: center; gap: 9px;
-  background: none; border: 0; padding: 0; border-radius: 999px; cursor: default;
+  background: none; border: 0; padding: 3px; border-radius: 999px; cursor: pointer;
+  transition: background 0.15s ease;
 }
+.auth-trigger:hover { background: var(--press); }
 .auth-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 1px solid var(--line); }
+.auth-avatar-wrap { position: relative; display: inline-flex; flex: none; }
+/* unread-matches signal on the avatar itself — the menu hides the count, the
+   dot keeps the invitation visible at a glance */
+.auth-dot {
+  position: absolute; top: -1px; right: -1px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--accent); border: 1.5px solid var(--bg);
+}
 .auth-avatar-fallback {
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--primary); color: #fff; font-size: 0.8438rem; font-family: var(--serif-d);
 }
 .auth-name { font-size: 0.8438rem; color: var(--ink); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* normal screens: the visible inline Sign out (original behaviour) */
-.auth-signout-inline {
-  font-family: var(--serif-b); font-size: 0.75rem; color: var(--muted); cursor: pointer;
-  background: none; border: none; padding: 4px 2px; text-decoration: underline;
-  text-underline-offset: 2px; transition: color 0.15s ease;
-}
-.auth-signout-inline:hover { color: var(--accent-text); }
-
-/* the popover is used ONLY on very narrow screens (see the <420px block) */
+/* account menu (all widths) — same chrome as the admin menu */
 .auth-pop {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
-  min-width: 180px; display: none; flex-direction: column; gap: 2px;
+  min-width: 190px; display: none; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
   padding: 6px; box-shadow: 0 12px 34px rgba(44, 66, 50, 0.16);
   animation: admin-pop-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.auth-user.open .auth-pop { display: flex; }
 .auth-pop-name {
   font-size: 0.8125rem; color: var(--muted); padding: 7px 11px 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-bottom: 1px solid var(--line-soft); margin-bottom: 4px;
 }
-.auth-signout {
-  display: flex; width: 100%; cursor: pointer; text-align: left;
-  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink);
-  background: none; border: 0; border-radius: 8px; padding: 9px 11px;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.auth-signout:hover { background: var(--press); color: var(--accent-text); }
 
-/* under 420px: hide the inline button, tuck Sign out under the avatar */
-@media (max-width: 419px) {
-  .auth-trigger { cursor: pointer; padding: 3px; transition: background 0.15s ease; }
-  .auth-trigger:hover { background: var(--press); }
-  .auth-signout-inline { display: none; }
-  .auth-user.open .auth-pop { display: flex; }
+/* ── the matchstick (Tamada, Noun Project) ─────────────────────────────
+   One-path linework artwork. Base is ink; opting in reveals an orange copy
+   clipped to the flame + ember head. All motion lives in the flame alone:
+   lit + hover = flicker; unlit + hover = a faint ignition preview teasing
+   the opt-in. Opacity only — a transform would expose the ink copy
+   underneath. stroke fattens the thin linework so it survives 22px. */
+.match-icon { flex: none; overflow: visible; }
+.signout-icon { flex: none; color: var(--ink-soft); }
+/* sign-out: the arrow leans toward the door on row hover */
+.signout-icon .so-arrow { transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1); }
+.admin-item:hover .signout-icon .so-arrow { transform: translateX(1.6px); }
+.match-icon .match-base { fill: var(--ink-soft); stroke: var(--ink-soft); stroke-width: 2; }
+.match-icon .match-base path { transition: opacity 0.2s ease; }
+.match-icon .match-flame {
+  opacity: 0; transition: opacity 0.25s ease;
+  /* sway pivots at the head. The motion is small enough that the ink copy
+     underneath never peeks past sub-pixel. */
+  transform-box: fill-box; transform-origin: 66% 54%;
+}
+.match-icon .match-flame path {
+  fill: var(--accent-text); stroke: var(--accent-text); stroke-width: 2;
+  transform-box: fill-box; transform-origin: 66% 58%;
+}
+/* unlit: same flame, ink — it only ever shows on hover */
+.match-icon:not(.lit) .match-flame path { fill: var(--ink-soft); stroke: var(--ink-soft); }
+.match-icon.lit .match-flame { opacity: 1; }
+/* whenever the overlay owns the flame (lit, or hover on either state), hide
+   the identical ink copy underneath — that frees the waver from sub-pixel
+   amplitudes: nothing static peeks out behind the moving flame */
+.match-icon.lit .match-base path,
+.admin-item:hover .match-icon .match-base path { opacity: 0; }
+.admin-item:hover .match-icon .match-flame {
+  opacity: 1;
+  animation: flame-sway 1.3s ease-in-out infinite;
+}
+.admin-item:hover .match-icon .match-flame path { animation: flame-lick 0.7s ease-in-out infinite; }
+/* real fire doesn't loop: two motions at non-harmonic periods (1.3s sway on
+   the group, 0.7s lick on the path) beat against each other, so the combined
+   pattern only repeats every ~9s */
+@keyframes flame-sway {
+  0%, 100% { transform: none; }
+  35% { transform: rotate(-6.5deg); }
+  70% { transform: rotate(4.5deg); }
+}
+@keyframes flame-lick {
+  0%, 100% { transform: none; opacity: 1; }
+  28% { transform: scale(1.06, 0.91) translateX(0.6px); opacity: 0.88; }
+  56% { transform: scale(0.94, 1.1) translateY(-1px); opacity: 1; }
+  82% { transform: scale(1.04, 0.96) translateX(-0.4px); opacity: 0.92; }
 }
 
 /* ---------- controls ---------- */
@@ -347,6 +386,12 @@ a.spot-cover:hover { filter: brightness(1.06); }
   letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--accent-text); background: transparent; border: 1px dashed var(--accent-text);
 }
+/* Beta marker: same dashed-accent badge, compact for the account-menu row and
+   the modal eyebrow (reset the inline-context margin/baseline nudge) */
+.tag-beta { margin-left: 7px; padding: 2px 7px; vertical-align: baseline; font-size: 0.5625rem; }
+.admin-item .tag-beta { margin-left: 0; }
+/* in the modal title, solid border + optical centre against the large heading */
+.ed-head h2 .tag-beta { border-style: solid; vertical-align: 4px; }
 
 .spot-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
 .meta-block { min-width: 0; }
@@ -1303,3 +1348,119 @@ body .sl-footer a:hover { color: var(--ink-soft); }
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
   font-size: 0.6875rem; font-weight: 700; color: #fffefb; background: var(--accent-text);
 }
+
+/* ── Spot Matches ─────────────────────────────────────────────────────────
+   opt-in people matching: the modal and the per-spot strip (the launcher
+   lives in the account menu — see .auth-pop / .match-icon above) */
+
+/* modal (reuses .ed-scrim / .ed-panel chrome) */
+/* the crossed-out "spot" in the eyebrow: lighter orange so the correction
+   reads at a glance */
+.ed-eyebrow s {
+  color: color-mix(in oklab, var(--accent-text) 55%, var(--bg));
+  text-decoration-thickness: 1px;
+}
+.mt-lede { margin: 0; font-size: 0.9375rem; line-height: 1.55; color: var(--ink-soft); text-wrap: pretty; }
+.mt-lede em { font-style: normal; font-weight: 700; color: var(--ink); }
+.mt-optin { display: flex; flex-direction: column; gap: 14px; }
+
+.mt-seg { display: flex; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.mt-seg-btn {
+  flex: 1; font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; cursor: pointer;
+  color: var(--ink-soft); background: transparent; border: 0; border-radius: 9px; padding: 8px 6px;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.mt-seg-btn:hover { color: var(--ink); }
+.mt-seg-btn.on { color: #fffefb; background: var(--primary); }
+
+.mt-input { font-size: 0.9375rem; }
+.mt-fineprint { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
+
+.mt-actions { display: flex; align-items: center; gap: 10px; }
+.mt-primary {
+  font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 700; cursor: pointer;
+  color: #fffefb; background: var(--primary); border: 1px solid var(--primary);
+  border-radius: 11px; padding: 10px 20px; transition: filter 0.14s ease, transform 0.1s ease;
+}
+.mt-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.mt-primary:disabled { opacity: 0.55; cursor: default; }
+.mt-ghost { font-family: var(--serif-b); font-size: 0.875rem; font-weight: 600; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 8px 6px; }
+.mt-ghost:hover { color: var(--ink); }
+
+.mt-status { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); }
+.mt-switch { display: inline-flex; align-items: center; gap: 9px; font-family: var(--serif-b); font-size: 0.9063rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+.mt-switch input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.mt-linkbtn { align-self: flex-start; font-family: var(--serif-b); font-size: 0.8125rem; color: var(--accent-text); background: none; border: 0; cursor: pointer; padding: 0; text-transform: capitalize; }
+.mt-linkbtn:hover { text-decoration: underline; }
+
+.mt-empty { text-align: left; }
+.mt-empty p { margin: 0; font-family: var(--serif-d); font-size: 1rem; color: var(--ink); }
+.mt-empty-sub { margin-top: 6px !important; font-family: var(--serif-b) !important; font-size: 0.875rem !important; color: var(--muted) !important; line-height: 1.5; text-wrap: pretty; }
+
+.mt-matches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.mt-match { display: flex; align-items: center; gap: 11px; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); }
+.mt-match:last-child { border-bottom: 0; }
+.mt-match-main { display: flex; flex-direction: column; min-width: 0; }
+.mt-match-name { font-family: var(--serif-d); font-size: 0.9375rem; font-weight: 600; color: var(--ink); }
+.mt-match-sub { font-size: 0.75rem; color: var(--muted); }
+.mt-contact {
+  margin-left: auto; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; color: var(--accent-text); text-decoration: none;
+  background: var(--accent-wash); border: 1px solid var(--accent-line); border-radius: 999px; padding: 5px 13px;
+}
+.mt-contact:hover { text-decoration: underline; }
+
+.mt-leave { align-self: flex-start; margin-top: 4px; font-family: var(--serif-b); font-size: 0.8125rem; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.mt-leave:hover:not(:disabled) { color: var(--accent-text); }
+.mt-leave:disabled { opacity: 0.5; cursor: default; }
+
+/* per-spot strip under a saved card */
+.sm-invite {
+  display: flex; align-items: center; gap: 8px; margin-top: 14px; width: 100%;
+  color: var(--accent-text); background: var(--accent-wash); border: 1px dashed var(--accent-line);
+  border-radius: 12px; padding: 10px 13px; transition: background 0.14s ease;
+}
+.sm-invite:hover { background: color-mix(in oklab, var(--accent-wash) 60%, var(--accent) 12%); }
+.sm-invite-cta {
+  display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; text-align: left; cursor: pointer;
+  color: inherit; background: none; border: 0; padding: 0;
+}
+.sm-invite-cta svg { flex: none; }
+.sm-invite-x {
+  flex: none; cursor: pointer; color: var(--accent-text); opacity: 0.7;
+  background: none; border: 0; font-size: 1.05rem; line-height: 1; padding: 2px 4px;
+  transition: opacity 0.14s ease;
+}
+.sm-invite-x:hover { opacity: 1; }
+
+.sm-wrap { margin-top: 16px; padding: 13px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.sm-head { font-family: var(--serif-b); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-text); margin-bottom: 10px; }
+.sm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.sm-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.sm-who { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.sm-name { font-family: var(--serif-d); font-size: 0.9063rem; font-weight: 600; color: var(--ink); }
+.sm-sub { font-size: 0.7188rem; color: var(--muted); }
+.sm-like {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font-family: var(--serif-b); font-size: 0.7812rem; font-weight: 600; cursor: pointer;
+  color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.sm-like:hover { color: var(--accent-text); border-color: var(--accent-line); }
+.sm-like.on { color: #fffefb; background: var(--accent); border-color: var(--accent); }
+.sm-like svg { flex: none; }
+.sm-hide { flex: none; font-family: var(--serif-b); font-size: 0.7188rem; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 2px; }
+.sm-hide:hover { color: var(--accent-text); }
+.sm-more { margin-top: 8px; font-family: var(--serif-b); font-size: 0.7812rem; font-weight: 600; color: var(--accent-text); background: none; border: 0; cursor: pointer; padding: 2px 0; }
+
+@media (max-width: 900px) {
+  .sm-name { font-size: 0.875rem; }
+  .mt-match-name { font-size: 0.9063rem; }
+  .mt-contact { max-width: 42%; }
+}
+
+/* full "wants to go here too" list inside the sheet: roomier rows + dividers */
+.sm-list-sheet { gap: 0; }
+.sm-list-sheet .sm-row { padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+.sm-list-sheet .sm-row:last-child { border-bottom: 0; }
