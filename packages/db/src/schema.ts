@@ -611,9 +611,10 @@ export const feedback = pgTable(
  * feature usage — so we can compute DAU/MAU and "most-used features" with plain
  * SQL (see packages/db/analytics.sql, or `spots analytics`).
  *
- * Every actor is identified by `coalesce(user_id, anon_id)`: signed-in users get
- * their stable `auth.uid()` (stamped server-side); everyone else carries a
- * client-generated `anon_id` persisted in localStorage. Since our audience is
+ * Actors are STITCHED at query time (see analytics.sql): signed-in users get
+ * their stable `auth.uid()` (stamped server-side), anyone else a client-generated
+ * `anon_id` (localStorage), and any anon_id that ever co-occurred with a user_id
+ * counts as that user — naive coalesce() double-counts people. Since our audience is
  * Addis Ababa (outside the EU cookie-consent regime) we track anonymous visitors
  * too, which is what makes whole-population DAU/MAU possible.
  *
@@ -631,6 +632,7 @@ export const events = pgTable(
     userId: text("user_id").default(sql`(auth.uid())::text`), // null for anon
     anonId: text("anon_id"), // stable per-device id (localStorage), for anon DAU/MAU
     path: text("path"), // route the event fired on
+    userAgent: text("user_agent"), // best-effort UA string, for bot filtering
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

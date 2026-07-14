@@ -148,6 +148,13 @@
       "when": 1782472300000,
       "tag": "0020_my_matches_shared_spots",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782472400000,
+      "tag": "0021_events_user_agent",
+      "breakpoints": true
     }
   ]
 }
