@@ -27,7 +27,10 @@ function uuid(): string {
   });
 }
 
-/** Stable id for this device; persisted in localStorage, falls back to memory. */
+/** Stable id for this device; persisted in localStorage, then sessionStorage,
+ * then memory. Each fallback shortens the id's life (device → tab → page load);
+ * without the ladder, one storage-blocked regular would mint a fresh "user"
+ * every visit and quietly inflate DAU/MAU. */
 function anonId(): string {
   try {
     let id = localStorage.getItem(AID_KEY);
@@ -37,7 +40,16 @@ function anonId(): string {
     }
     return id;
   } catch {
-    // private mode / storage blocked — keep one id for the page session
+    /* private mode / storage blocked — try per-tab, then per-page-load */
+  }
+  try {
+    let id = sessionStorage.getItem(AID_KEY);
+    if (!id) {
+      id = uuid();
+      sessionStorage.setItem(AID_KEY, id);
+    }
+    return id;
+  } catch {
     return (memoryAnonId ??= uuid());
   }
 }
@@ -53,6 +65,8 @@ export async function track(
       props: props ?? null,
       anon_id: anonId(),
       path: typeof window !== "undefined" ? window.location.pathname : null,
+      // UA lets us separate crawlers/preview bots from humans after the fact
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     });
   } catch {
     /* analytics must never disrupt the app */
