@@ -4,11 +4,11 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
 import { App } from "./App";
-import { NearMe } from "./NearMe";
 import { WhatsNewButton } from "./components/WhatsNewButton";
 import { FeedbackLauncher } from "./components/FeedbackLauncher";
 import "leaflet/dist/leaflet.css";
@@ -30,7 +30,8 @@ const indexRoute = createRoute({
 const nearRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/near",
-  component: NearMe,
+  // separate chunk: visitors landing on "/" never download the Near Me page
+  component: lazyRouteComponent(() => import("./NearMe"), "NearMe"),
 });
 const router = createRouter({
   routeTree: rootRoute.addChildren([indexRoute, nearRoute]),

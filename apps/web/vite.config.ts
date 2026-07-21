@@ -79,6 +79,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendor libs change only on dependency bumps: keeping them in their
+        // own chunks lets returning visitors (and the PWA precache) reuse them
+        // across app deploys instead of re-downloading one monolithic bundle.
+        advancedChunks: {
+          groups: [
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: "router", test: /node_modules[\\/]@tanstack[\\/]/ },
+            { name: "supabase", test: /node_modules[\\/]@supabase[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   // Load env from the repo root so the shared .env (VITE_-prefixed vars only)
   // is picked up. The secret key is never VITE_-prefixed, so it isn't exposed.
   envDir: fileURLToPath(new URL("../../", import.meta.url)),
