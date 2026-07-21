@@ -12,16 +12,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@spots/db": "workspace:*",
     "@radix-ui/react-slider": "^1.4.1",
     "@radix-ui/react-tooltip": "^1.2.10",
+    "@spots/db": "workspace:*",
     "@supabase/supabase-js": "^2.108.1",
     "@tanstack/react-router": "^1.170.15",
     "canvas-confetti": "^1.9.4",
     "fuse.js": "^7.4.2",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "web-vitals": "^5.3.0"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

@@ -13,6 +13,9 @@ import { WhatsNewButton } from "./components/WhatsNewButton";
 import { FeedbackLauncher } from "./components/FeedbackLauncher";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
+import { initVitals } from "./lib/vitals";
+
+initVitals();
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 const indexRoute = createRoute({
