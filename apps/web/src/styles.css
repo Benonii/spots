@@ -1,3 +1,14 @@
+/* Self-hosted variable font: one 28KB file covers weights 300-700 (replaces
+   the 4-weight Google Fonts request chain across two third-party origins).
+   Preloaded from index.html; keep the paths in sync. */
+@font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/quicksand-latin.woff2") format("woff2");
+}
+
 :root {
   /* warm off-whites instead of pure #fff — tinted toward the brand */
   --bg: #fbf9f4; --bg-2: #fbf9f4; --card: #fffefb;

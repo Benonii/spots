@@ -43,11 +43,14 @@
     />
     <meta name="twitter:image" content="/og.png" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Self-hosted variable font (declared in styles.css); preload starts the
+         download alongside the HTML instead of after a CSS discovery chain. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/quicksand-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <script
       src="https://www.getshiplog.site/widget.js"
