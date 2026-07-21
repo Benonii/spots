@@ -117,6 +117,36 @@ function friendlyError(e: unknown): string {
   return "Couldn't save your changes. Please try again.";
 }
 
+/** Stand-in for SpotCard while spots load. Rendered inside the same layout as
+ * the real card so late-arriving data replaces it in place instead of pushing
+ * painted content around (CLS). */
+function SkeletonCard() {
+  return (
+    <div className="sk-card" aria-busy="true" aria-label="Loading spots…">
+      <div className="sk sk-cover" />
+      <div className="sk-body">
+        <div className="sk sk-title" />
+        <div className="sk sk-loc" />
+        <div className="sk-row">
+          <span className="sk sk-pill" />
+          <span className="sk sk-pill" />
+        </div>
+        <div className="sk-lines">
+          <div className="sk sk-line" />
+          <div className="sk sk-line" />
+          <div className="sk sk-line sk-short" />
+        </div>
+        <div className="sk-row sk-tags">
+          <span className="sk sk-tag" />
+          <span className="sk sk-tag" />
+          <span className="sk sk-tag" />
+        </div>
+      </div>
+      <div className="sk sk-map" />
+    </div>
+  );
+}
+
 export function App() {
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -690,44 +720,7 @@ export function App() {
       </div>
     );
   }
-  if (!spots) {
-    return (
-      <div className="app">
-        <header className="topbar">
-          <div className="brand">
-            <BrandMark className="brand-mark" />
-            <div className="brand-text">
-              <h1>Where to next</h1>
-              <p>Date spots around Addis · sourced from the people who actually went</p>
-            </div>
-          </div>
-        </header>
-        <div className="sk-card" aria-busy="true" aria-label="Loading spots…">
-          <div className="sk sk-cover" />
-          <div className="sk-body">
-            <div className="sk sk-title" />
-            <div className="sk sk-loc" />
-            <div className="sk-row">
-              <span className="sk sk-pill" />
-              <span className="sk sk-pill" />
-            </div>
-            <div className="sk-lines">
-              <div className="sk sk-line" />
-              <div className="sk sk-line" />
-              <div className="sk sk-line sk-short" />
-            </div>
-            <div className="sk-row sk-tags">
-              <span className="sk sk-tag" />
-              <span className="sk sk-tag" />
-              <span className="sk sk-tag" />
-            </div>
-          </div>
-          <div className="sk sk-map" />
-        </div>
-      </div>
-    );
-  }
-  if (!spots.length) {
+  if (spots && !spots.length) {
     return (
       <div className="appstate">
         <h2>No spots yet</h2>
@@ -747,13 +740,21 @@ export function App() {
             <h1>Where to next</h1>
             <p>Date spots around Addis · sourced from the people who actually went</p>
             <div className="brand-count brand-count-mobile">
-              {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+              {spots ? (
+                `${spots.length} places${user ? ` · ${visited.length} visited` : ""}`
+              ) : (
+                <span className="sk sk-count" aria-hidden="true" />
+              )}
             </div>
           </div>
         </div>
         <div className="topbar-right">
           <div className="brand-count brand-count-desktop">
-            {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+            {spots ? (
+              `${spots.length} places${user ? ` · ${visited.length} visited` : ""}`
+            ) : (
+              <span className="sk sk-count" aria-hidden="true" />
+            )}
           </div>
           <Tooltip label="Near me">
             <Link
@@ -868,7 +869,11 @@ export function App() {
         ))}
       </section>
 
-      {current ? (
+      {!spots ? (
+        <div className="spot-stage">
+          <SkeletonCard />
+        </div>
+      ) : current ? (
         <div className="spot-stage">
           {isAdmin && (role === "super" || current.owner_id === user?.id) && (
             <button

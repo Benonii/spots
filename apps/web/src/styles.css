@@ -67,6 +67,7 @@ body {
 .brand-text h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; letter-spacing: 0.2px; color: var(--ink); }
 .brand-text p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); font-style: italic; }
 .brand-count { font-size: 0.7812rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.sk-count { display: inline-block; height: 12px; width: 84px; vertical-align: middle; }
 /* desktop: count sits top-right by the auth button; mobile: under the title */
 .brand-count-mobile { display: none; margin-top: 7px; }
 
