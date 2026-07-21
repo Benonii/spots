@@ -150,10 +150,30 @@ function LeafletMap({ spot }: { spot: Spot }) {
   const mapRef = useRef<Leaflet.Map | null>(null);
   const markerRef = useRef<Leaflet.Marker | null>(null);
 
-  // init once (StrictMode-safe: cleanup tears the map down). Leaflet is loaded
-  // on demand so its ~150KB stays out of the initial bundle.
+  // Leaflet (~150KB) + tiles load only once the map container is actually on
+  // screen (on phones it sits below the fold), so they never compete with the
+  // cover image / spots data for first-paint bandwidth.
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
-    if (!elRef.current || mapRef.current) return;
+    const el = elRef.current;
+    if (!el || visible) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true); // very old browsers: behave as before
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setVisible(true);
+      },
+      { rootMargin: "200px" }, // start loading slightly before it scrolls in
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible]);
+
+  // init once visible (StrictMode-safe: cleanup tears the map down)
+  useEffect(() => {
+    if (!visible || !elRef.current || mapRef.current) return;
     let cancelled = false;
     let teardown = () => {};
     void import("leaflet").then(({ default: L }) => {
@@ -184,7 +204,7 @@ function LeafletMap({ spot }: { spot: Spot }) {
       cancelled = true;
       teardown();
     };
-  }, []);
+  }, [visible]);
 
   // recenter + move marker when the spot changes
   useEffect(() => {

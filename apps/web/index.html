@@ -57,6 +57,37 @@
       data-widget-id="88b2d3ba-1dc4-41e3-b0ef-a37d3d4872fc"
       async
     ></script>
+    <!-- Start the spots query during HTML parse, in parallel with the JS
+         bundle download; fetchSpots() (lib/supabase.ts) consumes the promise.
+         Keep URL/headers in sync with that file. %VITE_*% is inlined by Vite. -->
+    <script>
+      // Signed-in users skip the preload: their supabase-js query carries a JWT
+      // (admins see hidden drafts via RLS) that this anon-key fetch lacks.
+      try {
+        var signedIn = Object.keys(localStorage).some(function (k) {
+          return k.indexOf("sb-") === 0 && k.indexOf("-auth-token") > 0;
+        });
+      } catch (e) {
+        var signedIn = false;
+      }
+      if (!signedIn) {
+        window.__spotsPreload = fetch(
+          "%VITE_SUPABASE_URL%/rest/v1/spots?select=*",
+          {
+            headers: {
+              apikey: "%VITE_SUPABASE_PUBLISHABLE_KEY%",
+              authorization: "Bearer %VITE_SUPABASE_PUBLISHABLE_KEY%",
+            },
+          },
+        ).then(function (r) {
+          if (!r.ok) throw new Error("preload " + r.status);
+          return r.json();
+        });
+        // swallow so an early failure can't surface as unhandled; the consumer
+        // re-awaits and falls back to a normal client query
+        window.__spotsPreload.catch(function () {});
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
