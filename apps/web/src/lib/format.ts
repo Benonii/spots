@@ -27,9 +27,14 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
+/** Deterministic gradient for a spot — loading placeholder / no-cover fallback. */
+export function coverGradient(spot: Spot): string {
+  return COVERS[hash(spot.google_place_id) % COVERS.length]!;
+}
+
 /** CSS `background-image` value: thumbnail over a deterministic gradient fallback. */
 export function coverImage(spot: Spot): string {
-  const grad = COVERS[hash(spot.google_place_id) % COVERS.length]!;
+  const grad = coverGradient(spot);
   return spot.cover_image_url ? `url("${spot.cover_image_url}"), ${grad}` : grad;
 }
 

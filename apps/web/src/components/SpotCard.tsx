@@ -2,7 +2,7 @@ import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
 import { isNewSpot } from "../lib/categories";
-import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
+import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
 import { SpotMatches } from "./SpotMatches";
@@ -323,6 +323,22 @@ export function SpotCard({
 
   const coverChildren = (
     <>
+      {spot.cover_image_url && (
+        // real <img> (not CSS background) so it can carry fetchpriority="high":
+        // this is the LCP element and must win bandwidth over map/tiles/avatars
+        <img
+          className="cover-img"
+          src={spot.cover_image_url}
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            // broken URL: hide so the gradient shows instead of a broken icon
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
       {spot.hidden && <span className="spot-draft-tag">Draft · hidden</span>}
       <span className="cover-area">{spot.neighborhood ?? "Addis Ababa"}</span>
       <span className="cover-count">
@@ -335,7 +351,7 @@ export function SpotCard({
       )}
     </>
   );
-  const coverStyle = { backgroundImage: coverImage(spot) };
+  const coverStyle = { backgroundImage: coverGradient(spot) };
 
   return (
     <>
