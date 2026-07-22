@@ -2,7 +2,7 @@ import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
 import { isNewSpot } from "../lib/categories";
-import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, mapsUrl } from "../lib/format";
+import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, coverSrcSet, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
 import { SpotMatches } from "./SpotMatches";
@@ -349,13 +349,22 @@ export function SpotCard({
         <img
           className="cover-img"
           src={spot.cover_image_url}
+          srcSet={coverSrcSet(spot)}
+          sizes="(max-width: 900px) 100vw, 330px"
           alt=""
           fetchPriority="high"
           decoding="async"
           referrerPolicy="no-referrer"
           onError={(e) => {
-            // broken URL: hide so the gradient shows instead of a broken icon
-            (e.currentTarget as HTMLImageElement).style.display = "none";
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.srcset) {
+              // variant missing (e.g. fresh admin upload before the CLI's
+              // `covers --variants` run): retry with the original only
+              img.srcset = "";
+            } else {
+              // original broken too: hide so the gradient shows
+              img.style.display = "none";
+            }
           }}
         />
       )}
