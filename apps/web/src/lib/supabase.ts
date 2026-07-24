@@ -43,14 +43,32 @@ const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
  * Fetch all spots in one query (a few hundred rows; filter/sort happens
  * client-side per architecture.md §6). PostgREST may serialize `numeric` as
  * strings, so price/score fields are coerced to numbers here.
+ *
+ * First call may be served by the inline preload in index.html, which starts
+ * the same request during HTML parse (in parallel with the JS bundle) and
+ * parks the promise on `window.__spotsPreload`. Consumed at most once; any
+ * preload failure falls back to a normal client query.
  */
 export async function fetchSpots(): Promise<Spot[]> {
+  const preload = (window as { __spotsPreload?: Promise<unknown> }).__spotsPreload;
+  if (preload) {
+    delete (window as { __spotsPreload?: Promise<unknown> }).__spotsPreload;
+    try {
+      const rows = await preload;
+      if (Array.isArray(rows)) return mapSpots(rows);
+    } catch {
+      /* fall through to the client query */
+    }
+  }
   const { data, error } = await supabase.from("spots").select("*");
   if (error) throw new Error(error.message);
+  return mapSpots(data ?? []);
+}
 
-  return (data ?? []).map(
+function mapSpots(rows: unknown[]): Spot[] {
+  return (rows as Spot[]).map(
     (r): Spot => ({
-      ...(r as Spot),
+      ...r,
       lat: num(r.lat),
       lng: num(r.lng),
       price_min: numOrNull(r.price_min),

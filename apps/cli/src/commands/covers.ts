@@ -16,7 +16,13 @@ import { db, schema } from "../db.ts";
 import { requireKeys } from "../env.ts";
 import { fetchVideo } from "../lib/ytdlp.ts";
 import { jitter, sleep } from "../lib/throttle.ts";
-import { ensureCoversBucket, isRehosted, rehostCover } from "../lib/storage.ts";
+import {
+  coverVariantsExist,
+  ensureCoversBucket,
+  isRehosted,
+  rehostCover,
+  uploadCoverVariants,
+} from "../lib/storage.ts";
 
 export const coversCommand = defineCommand({
   meta: {
@@ -29,10 +35,54 @@ export const coversCommand = defineCommand({
       type: "boolean",
       description: "Re-host every spot, including those already on Storage",
     },
+    variants: {
+      type: "boolean",
+      description:
+        "Only backfill responsive WebP variants for covers already on Storage (no TikTok fetches)",
+    },
   },
   async run({ args }) {
     requireKeys("SUPABASE_URL", "SUPABASE_SECRET_KEY");
     await ensureCoversBucket();
+
+    // --variants: originals are already in our bucket; download each from
+    // Storage and upload the resized WebPs beside it. No yt-dlp, no throttle.
+    if (args.variants) {
+      const hosted = (
+        await db
+          .select({
+            placeId: schema.spots.googlePlaceId,
+            name: schema.spots.name,
+            coverImageUrl: schema.spots.coverImageUrl,
+          })
+          .from(schema.spots)
+      ).filter((s) => isRehosted(s.coverImageUrl));
+      consola.info(`${hosted.length} covers on Storage; checking variants…`);
+      let done = 0;
+      let skipped = 0;
+      let failed = 0;
+      for (const [i, s] of hosted.entries()) {
+        const label = `[${i + 1}/${hosted.length}] ${s.name}`;
+        try {
+          if (await coverVariantsExist(s.placeId)) {
+            skipped++;
+            continue;
+          }
+          const img = await fetch(s.coverImageUrl!);
+          if (!img.ok) throw new Error(`original fetch ${img.status}`);
+          await uploadCoverVariants(s.placeId, await img.arrayBuffer());
+          done++;
+          consola.log(`  ${label} ✓`);
+        } catch (e) {
+          failed++;
+          consola.warn(`  ${label} failed: ${(e as Error).message.slice(0, 120)}`);
+        }
+      }
+      consola.success(
+        `Variants: ${done} generated, ${skipped} already present${failed ? `, ${failed} failed` : ""}.`,
+      );
+      return;
+    }
 
     const spots = await db
       .select({

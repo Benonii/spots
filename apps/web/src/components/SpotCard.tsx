@@ -2,7 +2,7 @@ import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import type { Dimensions, Spot } from "../lib/types";
 import { isNewSpot } from "../lib/categories";
-import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverImage, mapsUrl } from "../lib/format";
+import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, coverSrcSet, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
 import { StarMeter } from "./Stars";
 import { SpotMatches } from "./SpotMatches";
@@ -150,10 +150,30 @@ function LeafletMap({ spot }: { spot: Spot }) {
   const mapRef = useRef<Leaflet.Map | null>(null);
   const markerRef = useRef<Leaflet.Marker | null>(null);
 
-  // init once (StrictMode-safe: cleanup tears the map down). Leaflet is loaded
-  // on demand so its ~150KB stays out of the initial bundle.
+  // Leaflet (~150KB) + tiles load only once the map container is actually on
+  // screen (on phones it sits below the fold), so they never compete with the
+  // cover image / spots data for first-paint bandwidth.
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
-    if (!elRef.current || mapRef.current) return;
+    const el = elRef.current;
+    if (!el || visible) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true); // very old browsers: behave as before
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setVisible(true);
+      },
+      { rootMargin: "200px" }, // start loading slightly before it scrolls in
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible]);
+
+  // init once visible (StrictMode-safe: cleanup tears the map down)
+  useEffect(() => {
+    if (!visible || !elRef.current || mapRef.current) return;
     let cancelled = false;
     let teardown = () => {};
     void import("leaflet").then(({ default: L }) => {
@@ -184,7 +204,7 @@ function LeafletMap({ spot }: { spot: Spot }) {
       cancelled = true;
       teardown();
     };
-  }, []);
+  }, [visible]);
 
   // recenter + move marker when the spot changes
   useEffect(() => {
@@ -323,6 +343,31 @@ export function SpotCard({
 
   const coverChildren = (
     <>
+      {spot.cover_image_url && (
+        // real <img> (not CSS background) so it can carry fetchpriority="high":
+        // this is the LCP element and must win bandwidth over map/tiles/avatars
+        <img
+          className="cover-img"
+          src={spot.cover_image_url}
+          srcSet={coverSrcSet(spot)}
+          sizes="(max-width: 900px) 100vw, 330px"
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.srcset) {
+              // variant missing (e.g. fresh admin upload before the CLI's
+              // `covers --variants` run): retry with the original only
+              img.srcset = "";
+            } else {
+              // original broken too: hide so the gradient shows
+              img.style.display = "none";
+            }
+          }}
+        />
+      )}
       {spot.hidden && <span className="spot-draft-tag">Draft · hidden</span>}
       <span className="cover-area">{spot.neighborhood ?? "Addis Ababa"}</span>
       <span className="cover-count">
@@ -335,7 +380,7 @@ export function SpotCard({
       )}
     </>
   );
-  const coverStyle = { backgroundImage: coverImage(spot) };
+  const coverStyle = { backgroundImage: coverGradient(spot) };
 
   return (
     <>

@@ -27,9 +27,32 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
+/**
+ * Responsive `srcset` for a cover hosted in our Storage bucket, derived by the
+ * ingestion naming convention `<placeId>-<width>.webp` (see CLI lib/storage.ts
+ * — widths must match COVER_VARIANT_WIDTHS there). Returns undefined for
+ * external URLs (e.g. not-yet-rehosted TikTok thumbnails): they have no
+ * variants, so the plain `src` is used as-is.
+ */
+export function coverSrcSet(spot: Spot): string | undefined {
+  const bucketBase = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/spot-covers/`;
+  // Variants exist only for covers the CLI re-hosted into our bucket. They are
+  // named by place id (NOT by the original's filename — admin uploads carry a
+  // random suffix, e.g. `<placeId>-3f9a01c2.jpg`); encode it: manual ids
+  // contain ":".
+  if (!spot.cover_image_url?.startsWith(bucketBase)) return undefined;
+  const stem = bucketBase + encodeURIComponent(spot.google_place_id);
+  return `${stem}-480.webp 480w, ${stem}-960.webp 960w`;
+}
+
+/** Deterministic gradient for a spot — loading placeholder / no-cover fallback. */
+export function coverGradient(spot: Spot): string {
+  return COVERS[hash(spot.google_place_id) % COVERS.length]!;
+}
+
 /** CSS `background-image` value: thumbnail over a deterministic gradient fallback. */
 export function coverImage(spot: Spot): string {
-  const grad = COVERS[hash(spot.google_place_id) % COVERS.length]!;
+  const grad = coverGradient(spot);
   return spot.cover_image_url ? `url("${spot.cover_image_url}"), ${grad}` : grad;
 }
 

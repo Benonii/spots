@@ -1,3 +1,14 @@
+/* Self-hosted variable font: one 28KB file covers weights 300-700 (replaces
+   the 4-weight Google Fonts request chain across two third-party origins).
+   Preloaded from index.html; keep the paths in sync. */
+@font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/quicksand-latin.woff2") format("woff2");
+}
+
 :root {
   /* warm off-whites instead of pure #fff — tinted toward the brand */
   --bg: #fbf9f4; --bg-2: #fbf9f4; --card: #fffefb;
@@ -67,6 +78,7 @@ body {
 .brand-text h1 { font-family: var(--serif-d); font-weight: 500; font-size: 1.5625rem; line-height: 1.05; margin: 0 0 4px; letter-spacing: 0.2px; color: var(--ink); }
 .brand-text p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); font-style: italic; }
 .brand-count { font-size: 0.7812rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.sk-count { display: inline-block; height: 12px; width: 84px; vertical-align: middle; }
 /* desktop: count sits top-right by the auth button; mobile: under the title */
 .brand-count-mobile { display: none; margin-top: 7px; }
 
@@ -343,6 +355,8 @@ body {
   background-size: cover; background-position: center; position: relative;
   overflow: hidden; border-right: 1px solid var(--line);
 }
+/* real <img> cover (LCP element); replicates background-size/position: cover */
+.cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 a.spot-cover { display: block; cursor: pointer; text-decoration: none; transition: filter 0.15s ease; }
 a.spot-cover:hover { filter: brightness(1.06); }
 .spot-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(20, 28, 20, 0.35)); }
@@ -845,6 +859,7 @@ a.spot-cover:hover { filter: brightness(1.06); }
   }
   /* portrait TikTok thumbnails — give them real height on phones */
   .spot-cover { height: clamp(360px, 52vh, 520px); background-position: center 22%; border-right: none; border-bottom: 1px solid var(--line); order: 0; }
+  .cover-img { object-position: center 22%; }
   .spot-left { order: 1; }
   /* smaller title on phones so name + New badge stay on one line, with the
      rest of the card's type scaled to keep the same hierarchy */

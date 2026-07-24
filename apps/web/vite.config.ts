@@ -73,24 +73,28 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "google-fonts-css" },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-webfonts",
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+          // (Google Fonts caching rules removed — Quicksand is self-hosted now
+          // and covered by the woff2 precache glob above.)
         ],
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendor libs change only on dependency bumps: keeping them in their
+        // own chunks lets returning visitors (and the PWA precache) reuse them
+        // across app deploys instead of re-downloading one monolithic bundle.
+        advancedChunks: {
+          groups: [
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: "router", test: /node_modules[\\/]@tanstack[\\/]/ },
+            { name: "supabase", test: /node_modules[\\/]@supabase[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   // Load env from the repo root so the shared .env (VITE_-prefixed vars only)
   // is picked up. The secret key is never VITE_-prefixed, so it isn't exposed.
   envDir: fileURLToPath(new URL("../../", import.meta.url)),

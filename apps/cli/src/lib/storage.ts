@@ -6,9 +6,15 @@
  * Storage REST API with the secret (service-role) key (no supabase-js dep);
  * CLI-only, so the secret never reaches the browser.
  */
+import sharp from "sharp";
 import { getEnv } from "../env.ts";
 
 export const COVERS_BUCKET = "spot-covers";
+
+/** Widths (px) of the responsive WebP variants uploaded next to each original.
+ * The web app derives `<placeId>-<w>.webp` URLs from cover_image_url by this
+ * naming convention — keep both sides in sync. */
+export const COVER_VARIANT_WIDTHS = [480, 960] as const;
 
 /** True if the Supabase Storage credentials are configured. */
 export function storageConfigured(): boolean {
@@ -87,5 +93,46 @@ export async function rehostCover(
   if (!up.ok) {
     throw new Error(`upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
   }
+  // Variants are best-effort: a decode failure must not lose the cover itself.
+  try {
+    await uploadCoverVariants(placeId, bytes);
+  } catch {
+    /* original still serves; `covers --variants` can retry later */
+  }
   return coverPublicUrl(path);
+}
+
+/**
+ * Resize + re-encode `bytes` into the responsive WebP variants and upload them
+ * as `<placeId>-<w>.webp`. `withoutEnlargement` keeps small originals as-is
+ * (upscaling would add bytes, not detail).
+ */
+export async function uploadCoverVariants(
+  placeId: string,
+  bytes: ArrayBuffer,
+): Promise<void> {
+  for (const w of COVER_VARIANT_WIDTHS) {
+    const webp = await sharp(Buffer.from(bytes))
+      .resize({ width: w, withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
+    const path = `${placeId}-${w}.webp`;
+    const up = await fetch(`${base()}/storage/v1/object/${COVERS_BUCKET}/${path}`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "image/webp", "x-upsert": "true" },
+      body: new Uint8Array(webp),
+    });
+    if (!up.ok) {
+      throw new Error(`variant upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
+    }
+  }
+}
+
+/** True if every responsive variant for `placeId` already exists in Storage. */
+export async function coverVariantsExist(placeId: string): Promise<boolean> {
+  for (const w of COVER_VARIANT_WIDTHS) {
+    const res = await fetch(coverPublicUrl(`${placeId}-${w}.webp`), { method: "HEAD" });
+    if (!res.ok) return false;
+  }
+  return true;
 }

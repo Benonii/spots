@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import Fuse from "fuse.js";
+import type Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
 import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
 import { fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
@@ -36,8 +36,14 @@ import { CommunityTable } from "./components/CommunityTable";
 import { AuthButton } from "./components/AuthButton";
 import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
-import { SpotEditor } from "./components/SpotEditor";
-import { TeamSheet } from "./components/TeamSheet";
+// Admin-only surfaces: split into on-demand chunks so regular visitors never
+// download them; fetched the moment the modal is opened.
+const SpotEditor = lazy(() =>
+  import("./components/SpotEditor").then((m) => ({ default: m.SpotEditor })),
+);
+const TeamSheet = lazy(() =>
+  import("./components/TeamSheet").then((m) => ({ default: m.TeamSheet })),
+);
 import { AdminMenu } from "./components/AdminMenu";
 import { MatchesModal } from "./components/MatchesModal";
 
@@ -115,6 +121,36 @@ function friendlyError(e: unknown): string {
     return "You're offline — changes will sync when you reconnect.";
   }
   return "Couldn't save your changes. Please try again.";
+}
+
+/** Stand-in for SpotCard while spots load. Rendered inside the same layout as
+ * the real card so late-arriving data replaces it in place instead of pushing
+ * painted content around (CLS). */
+function SkeletonCard() {
+  return (
+    <div className="sk-card" aria-busy="true" aria-label="Loading spots…">
+      <div className="sk sk-cover" />
+      <div className="sk-body">
+        <div className="sk sk-title" />
+        <div className="sk sk-loc" />
+        <div className="sk-row">
+          <span className="sk sk-pill" />
+          <span className="sk sk-pill" />
+        </div>
+        <div className="sk-lines">
+          <div className="sk sk-line" />
+          <div className="sk sk-line" />
+          <div className="sk sk-line sk-short" />
+        </div>
+        <div className="sk-row sk-tags">
+          <span className="sk sk-tag" />
+          <span className="sk sk-tag" />
+          <span className="sk sk-tag" />
+        </div>
+      </div>
+      <div className="sk sk-map" />
+    </div>
+  );
 }
 
 export function App() {
@@ -377,22 +413,39 @@ export function App() {
     return ["All areas", ...Array.from(new Set(names)).sort()];
   }, [spots]);
 
+  // fuse.js loads on the first search keystroke, not at boot — fuzzy matching
+  // is dead weight for the (majority) of visits that never type a query.
+  const [FuseCtor, setFuseCtor] = useState<typeof Fuse | null>(null);
+  useEffect(() => {
+    if (!query.trim() || FuseCtor) return;
+    let live = true;
+    void import("fuse.js").then(
+      (m) => live && setFuseCtor(() => m.default),
+      () => {}, // offline: substring fallback below keeps search usable
+    );
+    return () => {
+      live = false;
+    };
+  }, [query, FuseCtor]);
+
   const fuse = useMemo(
     () =>
-      new Fuse(spots ?? [], {
-        // name dominates: a spot *named* like the query should beat one whose
-        // summary merely mentions it
-        keys: [
-          { name: "name", weight: 3 },
-          { name: "tags", weight: 1.5 },
-          { name: "neighborhood", weight: 1 },
-          { name: "summary", weight: 0.5 },
-        ],
-        threshold: 0.4,
-        ignoreLocation: true,
-        includeScore: true,
-      }),
-    [spots],
+      FuseCtor
+        ? new FuseCtor(spots ?? [], {
+            // name dominates: a spot *named* like the query should beat one whose
+            // summary merely mentions it
+            keys: [
+              { name: "name", weight: 3 },
+              { name: "tags", weight: 1.5 },
+              { name: "neighborhood", weight: 1 },
+              { name: "summary", weight: 0.5 },
+            ],
+            threshold: 0.4,
+            ignoreLocation: true,
+            includeScore: true,
+          })
+        : null,
+    [FuseCtor, spots],
   );
 
   const draftCount = useMemo(() => (spots ?? []).filter((s) => s.hidden).length, [spots]);
@@ -409,10 +462,24 @@ export function App() {
     let list: Spot[];
     if (q) {
       const nq = q.toLowerCase();
-      for (const r of fuse.search(q)) {
-        const name = r.item.name.toLowerCase();
-        const pin = name === nq ? 0 : name.startsWith(nq) ? 1 : 2;
-        rank.set(r.item, [pin, r.score ?? 1]);
+      if (fuse) {
+        for (const r of fuse.search(q)) {
+          const name = r.item.name.toLowerCase();
+          const pin = name === nq ? 0 : name.startsWith(nq) ? 1 : 2;
+          rank.set(r.item, [pin, r.score ?? 1]);
+        }
+      } else {
+        // fuse chunk still in flight: plain substring match over the same
+        // fields, exact/prefix name matches pinned first like the fuzzy path
+        for (const s of spots ?? []) {
+          const name = s.name.toLowerCase();
+          const hit =
+            name.includes(nq) ||
+            (s.neighborhood ?? "").toLowerCase().includes(nq) ||
+            (s.tags ?? []).some((t) => t.toLowerCase().includes(nq)) ||
+            (s.summary ?? "").toLowerCase().includes(nq);
+          if (hit) rank.set(s, [name === nq ? 0 : name.startsWith(nq) ? 1 : 2, 0]);
+        }
       }
       list = [...rank.keys()];
     } else {
@@ -690,44 +757,7 @@ export function App() {
       </div>
     );
   }
-  if (!spots) {
-    return (
-      <div className="app">
-        <header className="topbar">
-          <div className="brand">
-            <BrandMark className="brand-mark" />
-            <div className="brand-text">
-              <h1>Where to next</h1>
-              <p>Date spots around Addis · sourced from the people who actually went</p>
-            </div>
-          </div>
-        </header>
-        <div className="sk-card" aria-busy="true" aria-label="Loading spots…">
-          <div className="sk sk-cover" />
-          <div className="sk-body">
-            <div className="sk sk-title" />
-            <div className="sk sk-loc" />
-            <div className="sk-row">
-              <span className="sk sk-pill" />
-              <span className="sk sk-pill" />
-            </div>
-            <div className="sk-lines">
-              <div className="sk sk-line" />
-              <div className="sk sk-line" />
-              <div className="sk sk-line sk-short" />
-            </div>
-            <div className="sk-row sk-tags">
-              <span className="sk sk-tag" />
-              <span className="sk sk-tag" />
-              <span className="sk sk-tag" />
-            </div>
-          </div>
-          <div className="sk sk-map" />
-        </div>
-      </div>
-    );
-  }
-  if (!spots.length) {
+  if (spots && !spots.length) {
     return (
       <div className="appstate">
         <h2>No spots yet</h2>
@@ -747,13 +777,21 @@ export function App() {
             <h1>Where to next</h1>
             <p>Date spots around Addis · sourced from the people who actually went</p>
             <div className="brand-count brand-count-mobile">
-              {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+              {spots ? (
+                `${spots.length} places${user ? ` · ${visited.length} visited` : ""}`
+              ) : (
+                <span className="sk sk-count" aria-hidden="true" />
+              )}
             </div>
           </div>
         </div>
         <div className="topbar-right">
           <div className="brand-count brand-count-desktop">
-            {spots.length} places{user ? ` · ${visited.length} visited` : ""}
+            {spots ? (
+              `${spots.length} places${user ? ` · ${visited.length} visited` : ""}`
+            ) : (
+              <span className="sk sk-count" aria-hidden="true" />
+            )}
           </div>
           <Tooltip label="Near me">
             <Link
@@ -868,7 +906,11 @@ export function App() {
         ))}
       </section>
 
-      {current ? (
+      {!spots ? (
+        <div className="spot-stage">
+          <SkeletonCard />
+        </div>
+      ) : current ? (
         <div className="spot-stage">
           {isAdmin && (role === "super" || current.owner_id === user?.id) && (
             <button
@@ -1009,6 +1051,7 @@ export function App() {
       )}
 
       {editing && user && (
+        <Suspense fallback={null}>
         <SpotEditor
           mode={editing.mode}
           spot={editing.mode === "edit" ? editing.spot : undefined}
@@ -1035,9 +1078,14 @@ export function App() {
             loadSpots();
           }}
         />
+        </Suspense>
       )}
 
-      {teamOpen && user && <TeamSheet meId={user.id} onClose={() => setTeamOpen(false)} />}
+      {teamOpen && user && (
+        <Suspense fallback={null}>
+          <TeamSheet meId={user.id} onClose={() => setTeamOpen(false)} />
+        </Suspense>
+      )}
 
       {matchesOpen && user && (
         <MatchesModal
