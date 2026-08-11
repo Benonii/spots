@@ -44,7 +44,12 @@ export default defineConfig({
             // Public spots catalog (PostgREST GET). NetworkFirst: fresh when
             // online, last-loaded list when offline. Per-user/auth endpoints
             // (visits, saved, profiles) are intentionally NOT cached.
-            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/rest\/v1\/spots.*/i,
+            //
+            // End-anchored on `select=*` so it matches the catalog query alone.
+            // The single-row fetch in index.html carries a random `&offset=`
+            // that never repeats, and would otherwise fill this 8-entry cache
+            // with dead URLs and evict the catalog that offline mode needs.
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/rest\/v1\/spots\?select=\*$/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "spots-data",

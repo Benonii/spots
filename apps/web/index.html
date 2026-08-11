@@ -71,21 +71,71 @@
         var signedIn = false;
       }
       if (!signedIn) {
-        window.__spotsPreload = fetch(
-          "%VITE_SUPABASE_URL%/rest/v1/spots?select=*",
-          {
-            headers: {
-              apikey: "%VITE_SUPABASE_PUBLISHABLE_KEY%",
-              authorization: "Bearer %VITE_SUPABASE_PUBLISHABLE_KEY%",
-            },
-          },
-        ).then(function (r) {
+        var API = "%VITE_SUPABASE_URL%/rest/v1/spots";
+        var HEADERS = {
+          apikey: "%VITE_SUPABASE_PUBLISHABLE_KEY%",
+          authorization: "Bearer %VITE_SUPABASE_PUBLISHABLE_KEY%",
+        };
+        var json = function (r) {
           if (!r.ok) throw new Error("preload " + r.status);
           return r.json();
-        });
+        };
+
+        window.__spotsPreload = fetch(API + "?select=*", { headers: HEADERS }).then(json);
         // swallow so an early failure can't surface as unhandled; the consumer
         // re-awaits and falls back to a normal client query
         window.__spotsPreload.catch(function () {});
+
+        // A second, tiny query for the one spot painted first. The deck shows a
+        // random spot per load, so the full catalog above can't reveal which
+        // cover is the LCP image until all ~130KB of it has arrived — this row
+        // is ~1.5KB and unblocks the image roughly a second earlier.
+        var deepLink = null;
+        try {
+          deepLink = new URLSearchParams(window.location.search).get("spot");
+        } catch (e) {
+          /* no URLSearchParams — fall through to the random pick */
+        }
+        // Ceiling, not an exact count: an overshoot returns [] and the consumer
+        // falls back to the catalog. Bump it as the catalog grows.
+        var SPOT_CEILING = 380;
+        var firstQuery = deepLink
+          ? "?select=*&limit=1&google_place_id=eq." + encodeURIComponent(deepLink)
+          : "?select=*&limit=1&offset=" + Math.floor(Math.random() * SPOT_CEILING);
+
+        window.__spotsFirst = fetch(API + firstQuery, { headers: HEADERS })
+          .then(json)
+          .then(function (rows) {
+            var spot = rows && rows[0];
+            if (spot && spot.cover_image_url) preloadCover(spot);
+            return spot || null;
+          });
+        window.__spotsFirst.catch(function () {});
+      }
+
+      // Warm the LCP cover before React exists. Attributes must match the <img>
+      // in components/SpotCard.tsx exactly (same srcset, same sizes, no
+      // crossorigin) or the browser fetches the image twice instead of reusing
+      // this one. Variant naming mirrors coverSrcSet() in lib/format.ts and
+      // COVER_VARIANT_WIDTHS in the CLI's lib/storage.ts.
+      function preloadCover(spot) {
+        try {
+          var bucket = "%VITE_SUPABASE_URL%/storage/v1/object/public/spot-covers/";
+          var link = document.createElement("link");
+          link.rel = "preload";
+          link.as = "image";
+          link.setAttribute("fetchpriority", "high");
+          // Variants exist only for covers re-hosted into our own bucket.
+          if (spot.cover_image_url.indexOf(bucket) === 0) {
+            var stem = bucket + encodeURIComponent(spot.google_place_id);
+            link.setAttribute("imagesrcset", stem + "-480.webp 480w, " + stem + "-960.webp 960w");
+            link.setAttribute("imagesizes", "(max-width: 900px) 100vw, 330px");
+          }
+          link.href = spot.cover_image_url;
+          document.head.appendChild(link);
+        } catch (e) {
+          /* preload is an optimisation; never let it break the page */
+        }
       }
     </script>
   </head>

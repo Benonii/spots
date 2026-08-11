@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
 import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
-import { fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import { fetchFirstSpot, fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
 import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
@@ -219,6 +219,27 @@ export function App() {
     loadSpots();
   }, [loadSpots]);
 
+  // The one spot index.html fetched ahead of the catalog, so a card can paint
+  // while the catalog is still downloading — and whose cover it has already
+  // started preloading. The pick below waits for this to settle so the card we
+  // land on is the one whose image is in flight; `firstSettled` (never left
+  // pending, hence the cap) is what releases it.
+  const [firstSpot, setFirstSpot] = useState<Spot | null>(null);
+  const [firstSettled, setFirstSettled] = useState(false);
+  useEffect(() => {
+    let settled = false;
+    const settle = (s: Spot | null) => {
+      if (settled) return;
+      settled = true;
+      setFirstSpot(s);
+      setFirstSettled(true);
+    };
+    void fetchFirstSpot().then(settle);
+    // Never block the deck on this: 1.5s for a ~1.5KB row means it isn't coming.
+    const cap = setTimeout(() => settle(null), 1500);
+    return () => clearTimeout(cap);
+  }, []);
+
   // one page-view per load (drives DAU/MAU across signed-in + anon visitors)
   useEffect(() => {
     trackAppOpen();
@@ -386,16 +407,29 @@ export function App() {
 
   // show a *random* spot on every page load (not just the first), once spots arrive
   const pickedRandom = useRef(false);
+  // `index` is meaningless until one of the two effects here has aimed it; until
+  // then `current` renders firstSpot rather than filtered[0].
+  const [aligned, setAligned] = useState(false);
   useEffect(() => {
-    if (pickedRandom.current || !spots || !spots.length) return;
+    // Waiting on firstSettled keeps the rendered card and the preloaded cover in
+    // agreement: picking before it settles can re-roll onto a different spot and
+    // strand the image already in flight.
+    if (pickedRandom.current || !spots || !spots.length || !firstSettled) return;
     pickedRandom.current = true;
     // honor a deep-linked spot instead of a random one — the landing effect below
-    // will jump to it once the catalog is in the filtered list
+    // will jump to it (and set `aligned`) once it's in the filtered list
     if (pendingTarget) return;
-    setIndex(Math.floor(Math.random() * spots.length));
-    // pendingTarget is only read on the first run; intentionally not a dep
+    // firstSpot is already on screen and its cover already fetched: land on that
+    // same card instead of re-rolling. -1 means a filter excludes it, so fall
+    // through to a random pick rather than aiming at nothing.
+    const landed = firstSpot
+      ? filtered.findIndex((s) => s.google_place_id === firstSpot.google_place_id)
+      : -1;
+    setIndex(landed >= 0 ? landed : Math.floor(Math.random() * spots.length));
+    setAligned(true);
+    // pendingTarget/firstSpot/filtered are only read on the first run; not deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spots]);
+  }, [spots, firstSettled]);
 
   const spotsById = useMemo(
     () =>
@@ -528,6 +562,7 @@ export function App() {
     const idx = filtered.findIndex((s) => s.google_place_id === pendingTarget);
     if (idx >= 0) {
       setIndex(idx);
+      setAligned(true);
       setPendingTarget(null);
       // drop the `?spot=` param so a refresh doesn't re-jump (no-op for in-app jumps)
       if (window.location.search) {
@@ -538,9 +573,16 @@ export function App() {
   }, [pendingTarget, filtered]);
 
   const total = filtered.length;
-  const current: Spot | null = total
-    ? filtered[Math.min(index, total - 1)] ?? null
-    : null;
+  // Until `index` has been aimed at something, show the pre-fetched spot whose
+  // cover index.html is already loading — and if there isn't one, show the
+  // skeleton rather than filtered[0]. Painting filtered[0] here would download a
+  // cover for the highest-rated spot and then immediately swap it for the random
+  // pick, costing an image request on exactly the connections we're optimising.
+  // A deep link keeps the old fallback so a stale `?spot=` id can't strand the UI.
+  const fromList = total ? filtered[Math.min(index, total - 1)] ?? null : null;
+  const current: Spot | null = aligned
+    ? fromList
+    : (firstSpot ?? (pendingTarget ? fromList : null));
 
   const go = useCallback(
     (delta: number) => {
