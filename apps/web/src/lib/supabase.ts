@@ -65,6 +65,28 @@ export async function fetchSpots(): Promise<Spot[]> {
   return mapSpots(data ?? []);
 }
 
+/**
+ * The single spot index.html fetched for the first paint, or null if that
+ * request failed / overshot the offset ceiling / was skipped (signed-in users).
+ * Resolves ~1s before the full catalog, so the deck can paint one card while
+ * the rest is still in flight. Consumed at most once.
+ */
+let firstSpot: Promise<Spot | null> | null = null;
+
+export function fetchFirstSpot(): Promise<Spot | null> {
+  // Memoised, not just consumed-once: every caller must see the *same* spot.
+  // Handing null to a second caller (a remount, say) would make it re-roll onto
+  // a different card and strand the cover already preloaded for this one.
+  if (!firstSpot) {
+    const pending = (window as { __spotsFirst?: Promise<unknown> }).__spotsFirst;
+    delete (window as { __spotsFirst?: Promise<unknown> }).__spotsFirst;
+    firstSpot = Promise.resolve(pending ?? null)
+      .then((row) => (row ? mapSpots([row])[0] ?? null : null))
+      .catch(() => null); // the catalog query is the source of truth regardless
+  }
+  return firstSpot;
+}
+
 function mapSpots(rows: unknown[]): Spot[] {
   return (rows as Spot[]).map(
     (r): Spot => ({

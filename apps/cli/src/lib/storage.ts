@@ -16,6 +16,15 @@ export const COVERS_BUCKET = "spot-covers";
  * naming convention — keep both sides in sync. */
 export const COVER_VARIANT_WIDTHS = [480, 960] as const;
 
+/**
+ * Cache lifetime stored on every cover object. Storage defaults uploads to
+ * `no-cache`, which makes browsers revalidate the image on every page view.
+ * Covers sit at a stable path and only change when `covers --force` re-hosts
+ * one, so a long-but-finite window beats `immutable`: a forced refresh becomes
+ * visible within 30 days rather than never.
+ */
+export const COVER_CACHE_CONTROL = "max-age=2592000";
+
 /** True if the Supabase Storage credentials are configured. */
 export function storageConfigured(): boolean {
   const env = getEnv();
@@ -85,14 +94,7 @@ export async function rehostCover(
   // Stable path so re-runs overwrite in place. Extension is cosmetic (Storage
   // serves the stored content-type), kept as .jpg for simplicity.
   const path = `${placeId}.jpg`;
-  const up = await fetch(`${base()}/storage/v1/object/${COVERS_BUCKET}/${path}`, {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": contentType, "x-upsert": "true" },
-    body: bytes,
-  });
-  if (!up.ok) {
-    throw new Error(`upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
-  }
+  await putCover(path, bytes, contentType);
   // Variants are best-effort: a decode failure must not lose the cover itself.
   try {
     await uploadCoverVariants(placeId, bytes);
@@ -100,6 +102,27 @@ export async function rehostCover(
     /* original still serves; `covers --variants` can retry later */
   }
   return coverPublicUrl(path);
+}
+
+/** Upload one cover object, upserting in place with our cache lifetime. */
+export async function putCover(
+  path: string,
+  body: ArrayBuffer | Uint8Array,
+  contentType: string,
+): Promise<void> {
+  const up = await fetch(`${base()}/storage/v1/object/${COVERS_BUCKET}/${path}`, {
+    method: "POST",
+    headers: {
+      ...authHeaders(),
+      "Content-Type": contentType,
+      "cache-control": COVER_CACHE_CONTROL,
+      "x-upsert": "true",
+    },
+    body,
+  });
+  if (!up.ok) {
+    throw new Error(`upload ${path} ${up.status}: ${(await up.text()).slice(0, 200)}`);
+  }
 }
 
 /**
@@ -116,19 +139,19 @@ export async function uploadCoverVariants(
       .resize({ width: w, withoutEnlargement: true })
       .webp({ quality: 78 })
       .toBuffer();
-    const path = `${placeId}-${w}.webp`;
-    const up = await fetch(`${base()}/storage/v1/object/${COVERS_BUCKET}/${path}`, {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "image/webp", "x-upsert": "true" },
-      body: new Uint8Array(webp),
-    });
-    if (!up.ok) {
-      throw new Error(`variant upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
-    }
+    await putCover(`${placeId}-${w}.webp`, new Uint8Array(webp), "image/webp");
   }
 }
 
-/** True if every responsive variant for `placeId` already exists in Storage. */
+/**
+ * True if every responsive variant for `placeId` already exists in Storage.
+ *
+ * Existence only — deliberately not a cache-header check. Storage's metadata
+ * reads (`/object/info`, and response headers on a fresh GET) lag a write by a
+ * few seconds, so a header comparison here reports stale values and makes runs
+ * non-deterministic. Changing COVER_CACHE_CONTROL therefore needs a one-off
+ * forced re-upload; the existing objects were migrated on 2026-08-11.
+ */
 export async function coverVariantsExist(placeId: string): Promise<boolean> {
   for (const w of COVER_VARIANT_WIDTHS) {
     const res = await fetch(coverPublicUrl(`${placeId}-${w}.webp`), { method: "HEAD" });
