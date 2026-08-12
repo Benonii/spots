@@ -226,19 +226,30 @@ export function App() {
   // pending, hence the cap) is what releases it.
   const [firstSpot, setFirstSpot] = useState<Spot | null>(null);
   const [firstSettled, setFirstSettled] = useState(false);
+  const settleFirst = useRef((s: Spot | null) => {
+    void s;
+  });
   useEffect(() => {
     let settled = false;
-    const settle = (s: Spot | null) => {
+    settleFirst.current = (s: Spot | null) => {
       if (settled) return;
       settled = true;
       setFirstSpot(s);
       setFirstSettled(true);
     };
-    void fetchFirstSpot().then(settle);
-    // Never block the deck on this: 1.5s for a ~1.5KB row means it isn't coming.
-    const cap = setTimeout(() => settle(null), 1500);
-    return () => clearTimeout(cap);
+    void fetchFirstSpot().then((s) => settleFirst.current(s));
   }, []);
+
+  // Give up on the pre-fetched spot only once the catalog has landed — at that
+  // point we can render without it, so waiting longer costs LCP for nothing.
+  // A wall-clock cap would misfire on exactly the slow connections this is for:
+  // the row can take seconds there, and abandoning it re-rolls onto a different
+  // card, stranding the preloaded cover and shifting everything below it.
+  useEffect(() => {
+    if (!spots || firstSettled) return;
+    const grace = setTimeout(() => settleFirst.current(null), 400);
+    return () => clearTimeout(grace);
+  }, [spots, firstSettled]);
 
   // one page-view per load (drives DAU/MAU across signed-in + anon visitors)
   useEffect(() => {

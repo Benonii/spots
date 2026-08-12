@@ -124,7 +124,11 @@
           var link = document.createElement("link");
           link.rel = "preload";
           link.as = "image";
-          link.setAttribute("fetchpriority", "high");
+          // Deliberately NOT fetchpriority=high. The cover competes with the JS
+          // bundle for bandwidth, and until the bundle runs there is nothing to
+          // paint the image into: measured ~285ms *worse* LCP with high priority
+          // on a bundle-bound connection. The <img> keeps its own high priority,
+          // which is what matters once the render is close.
           // Variants exist only for covers re-hosted into our own bucket.
           if (spot.cover_image_url.indexOf(bucket) === 0) {
             var stem = bucket + encodeURIComponent(spot.google_place_id);
