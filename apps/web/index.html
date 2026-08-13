@@ -135,7 +135,7 @@
             // Empty means the deep-linked id no longer resolves — deleted, or
             // hidden from anon by RLS. (An overshot offset can't land here: with
             // count=exact it's a 416, which throws above.) Falls back to the
-            // catalog; the count stored above fixes the next load.
+            // catalog.
             var spot = rows && rows[0];
             if (spot && spot.cover_image_url) preloadCover(spot);
             return spot || null;
