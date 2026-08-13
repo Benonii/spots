@@ -67,7 +67,8 @@ export async function fetchSpots(): Promise<Spot[]> {
 
 /**
  * The single spot index.html fetched for the first paint, or null if that
- * request failed / overshot the offset ceiling / was skipped (signed-in users).
+ * request failed / overshot the learned row count (the catalog shrank since it
+ * was last cached) / was skipped (signed-in users).
  * Resolves ~1s before the full catalog, so the deck can paint one card while
  * the rest is still in flight. Consumed at most once.
  */
