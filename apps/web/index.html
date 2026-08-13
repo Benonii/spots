@@ -103,11 +103,12 @@
           /* no URLSearchParams — fall through to the random pick */
         }
         // The random offset needs a row count, which we don't have yet on the
-        // first request of a first visit — so learn it from every response
-        // (`Prefer: count=exact` makes PostgREST report the table total in
-        // content-range even for limit=1) and use it next time. Self-correcting
-        // as `spots ingest` grows the catalog; the fallback below is only ever
-        // used before the very first response teaches us the real number.
+        // first request of a first visit — so learn it from the offset query's
+        // response (`Prefer: count=exact` makes PostgREST report the row total
+        // in content-range even for limit=1) and use it next time.
+        // Self-correcting as `spots ingest` grows the catalog. The fallback is
+        // used until the first response teaches us the real number, and on every
+        // load for visitors whose localStorage is blocked.
         var SPOT_COUNT_FALLBACK = 380;
         var firstQuery = deepLink
           ? "?select=*&limit=1&google_place_id=eq." + encodeURIComponent(deepLink)
@@ -115,22 +116,26 @@
             Math.floor(Math.random() * (knownSpotCount() || SPOT_COUNT_FALLBACK));
 
         window.__spotsFirst = fetch(API + firstQuery, {
-          // new object: HEADERS is shared with the catalog fetch above
-          headers: Object.assign({ prefer: "count=exact" }, HEADERS),
+          // Count only the unfiltered query: PostgREST counts the rows the
+          // filter matched, so asking on a deep link reports `0-0/1` and would
+          // teach a catalog of one. New object either way — HEADERS is shared
+          // with the catalog fetch above.
+          headers: deepLink ? HEADERS : Object.assign({ prefer: "count=exact" }, HEADERS),
         })
           .then(function (r) {
             // Learn the total *before* the ok check: an offset past the end is a
             // 416, which still carries `content-range: */386`. Skipping it there
             // would leave a stale-high count overshooting on every future load
             // instead of self-correcting on the next one.
-            rememberSpotCount(r.headers.get("content-range"));
+            if (!deepLink) rememberSpotCount(r.headers.get("content-range"));
             if (!r.ok) throw new Error("preload " + r.status);
             return r.json();
           })
           .then(function (rows) {
-            // Empty means the offset overshot — only possible when the catalog
-            // shrank since the last visit. The count we just stored fixes the
-            // next load; this one falls back to the catalog.
+            // Empty means the deep-linked id no longer resolves — deleted, or
+            // hidden from anon by RLS. (An overshot offset can't land here: with
+            // count=exact it's a 416, which throws above.) Falls back to the
+            // catalog; the count stored above fixes the next load.
             var spot = rows && rows[0];
             if (spot && spot.cover_image_url) preloadCover(spot);
             return spot || null;
@@ -141,8 +146,12 @@
       // Row count learned from a previous visit, or 0 when we've never seen one.
       function knownSpotCount() {
         try {
+          // Bounded above as well as below: everything this writes is a real row
+          // total, but a hand-edited value near 1e21 would produce an offset
+          // PostgREST rejects with a 400 — and a 400 carries no content-range, so
+          // the usual "the response corrects the count" recovery never fires.
           var n = parseInt(localStorage.getItem(SPOT_COUNT_KEY), 10);
-          return n > 0 ? n : 0;
+          return n > 0 && n < 1e6 ? n : 0;
         } catch (e) {
           return 0; // storage blocked — the fallback constant applies
         }
