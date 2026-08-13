@@ -61,6 +61,12 @@
          bundle download; fetchSpots() (lib/supabase.ts) consumes the promise.
          Keep URL/headers in sync with that file. %VITE_*% is inlined by Vite. -->
     <script>
+      // Declared up here on purpose: the helpers below are hoisted and get called
+      // from inside the block that follows, but a `var` assignment further down
+      // would still be undefined at that point — which silently reads key
+      // "undefined" and makes the learned row count look absent.
+      var SPOT_COUNT_KEY = "spots:count";
+
       // Signed-in users skip the preload: their supabase-js query carries a JWT
       // (admins see hidden drafts via RLS) that this anon-key fetch lacks.
       try {
@@ -96,21 +102,60 @@
         } catch (e) {
           /* no URLSearchParams — fall through to the random pick */
         }
-        // Ceiling, not an exact count: an overshoot returns [] and the consumer
-        // falls back to the catalog. Bump it as the catalog grows.
-        var SPOT_CEILING = 380;
+        // The random offset needs a row count, which we don't have yet on the
+        // first request of a first visit — so learn it from every response
+        // (`Prefer: count=exact` makes PostgREST report the table total in
+        // content-range even for limit=1) and use it next time. Self-correcting
+        // as `spots ingest` grows the catalog; the fallback below is only ever
+        // used before the very first response teaches us the real number.
+        var SPOT_COUNT_FALLBACK = 380;
         var firstQuery = deepLink
           ? "?select=*&limit=1&google_place_id=eq." + encodeURIComponent(deepLink)
-          : "?select=*&limit=1&offset=" + Math.floor(Math.random() * SPOT_CEILING);
+          : "?select=*&limit=1&offset=" +
+            Math.floor(Math.random() * (knownSpotCount() || SPOT_COUNT_FALLBACK));
 
-        window.__spotsFirst = fetch(API + firstQuery, { headers: HEADERS })
-          .then(json)
+        window.__spotsFirst = fetch(API + firstQuery, {
+          // new object: HEADERS is shared with the catalog fetch above
+          headers: Object.assign({ prefer: "count=exact" }, HEADERS),
+        })
+          .then(function (r) {
+            // Learn the total *before* the ok check: an offset past the end is a
+            // 416, which still carries `content-range: */386`. Skipping it there
+            // would leave a stale-high count overshooting on every future load
+            // instead of self-correcting on the next one.
+            rememberSpotCount(r.headers.get("content-range"));
+            if (!r.ok) throw new Error("preload " + r.status);
+            return r.json();
+          })
           .then(function (rows) {
+            // Empty means the offset overshot — only possible when the catalog
+            // shrank since the last visit. The count we just stored fixes the
+            // next load; this one falls back to the catalog.
             var spot = rows && rows[0];
             if (spot && spot.cover_image_url) preloadCover(spot);
             return spot || null;
           });
         window.__spotsFirst.catch(function () {});
+      }
+
+      // Row count learned from a previous visit, or 0 when we've never seen one.
+      function knownSpotCount() {
+        try {
+          var n = parseInt(localStorage.getItem(SPOT_COUNT_KEY), 10);
+          return n > 0 ? n : 0;
+        } catch (e) {
+          return 0; // storage blocked — the fallback constant applies
+        }
+      }
+
+      /** Store the total from a PostgREST `content-range: 0-0/386` header. */
+      function rememberSpotCount(range) {
+        try {
+          var total = parseInt(String(range).split("/")[1], 10);
+          if (total > 0) localStorage.setItem(SPOT_COUNT_KEY, String(total));
+        } catch (e) {
+          /* never let bookkeeping break the page */
+        }
       }
 
       // Warm the LCP cover before React exists. Attributes must match the <img>
