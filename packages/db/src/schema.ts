@@ -850,6 +850,16 @@ export const happenings = pgTable(
       to: authenticatedRole,
       using: sql`is_admin()`,
     }),
+    // The scheduled poller runs in CI under a least-privilege login rather than
+    // the RLS-bypassing CLI connection, so it needs a policy of its own. Its
+    // GRANTs cover this table only — see drizzle/0023_poller_role.sql, which
+    // also creates the role (passwordless; the password is set out of band).
+    pgPolicy("poller manages happenings", {
+      for: "all",
+      to: "spots_poller",
+      using: sql`true`,
+      withCheck: sql`true`,
+    }),
   ],
 );
 
