@@ -211,3 +211,29 @@ export function buildPrompt(postedAt: Date | null, rawText: string): string {
   return `POSTED: ${posted}\nTIMEZONE: ${ADDIS_OFFSET} (Africa/Addis_Ababa)\n\nPOST:\n${rawText}`;
 }
 
+
+/**
+ * What a row's status should be after a re-extraction.
+ *
+ * Re-extraction refreshes fields; it must not overturn a decision already made.
+ * Adding the tags column meant running `--all`, which re-routed everything and
+ * reset 15 published events to pending — a prompt change should never
+ * un-publish the catalog.
+ *
+ * The exception is a re-extraction that invalidates the decision. A row that is
+ * no longer an event, or has lost its date, cannot stay published: the
+ * happenings_published_needs_start constraint would reject the write anyway.
+ */
+export function settleStatus(
+  current: string,
+  fresh: Routed,
+  isEvent: boolean,
+  startsAt: Date | null,
+): Routed {
+  const decided = current !== "pending";
+  const stillValid = isEvent && startsAt !== null;
+  if (decided && stillValid) {
+    return { status: current as Routed["status"], rejectedReason: null };
+  }
+  return fresh;
+}

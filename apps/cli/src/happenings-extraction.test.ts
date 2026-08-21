@@ -5,6 +5,7 @@ import {
   buildPrompt,
   expiresAt,
   addisDate,
+  settleStatus,
 } from "./happenings-extraction.ts";
 import type { HappeningExtraction } from "./happenings-extraction.ts";
 
@@ -147,5 +148,39 @@ describe("addisDate", () => {
   test("renders the Addis day, not the UTC one", () => {
     expect(addisDate(new Date("2026-08-21T00:00:00+03:00"))).toBe("2026-08-21");
     expect(addisDate(new Date("2026-08-21T23:30:00+03:00"))).toBe("2026-08-21");
+  });
+});
+
+describe("settleStatus", () => {
+  const fresh = { status: "pending", rejectedReason: null } as const;
+  const date = new Date("2026-08-29T19:00:00+03:00");
+
+  // The regression: adding a column meant re-extracting everything, which reset
+  // 15 published events to pending. A prompt change must not un-publish.
+  test("a published row survives re-extraction", () => {
+    expect(settleStatus("published", fresh, true, date)).toEqual({
+      status: "published",
+      rejectedReason: null,
+    });
+  });
+
+  test("a rejected row stays rejected", () => {
+    expect(settleStatus("rejected", fresh, true, date).status).toBe("rejected");
+  });
+
+  test("an undecided row takes the fresh verdict", () => {
+    const publish = { status: "published", rejectedReason: null } as const;
+    expect(settleStatus("pending", publish, true, date).status).toBe("published");
+  });
+
+  // Losing the date would violate happenings_published_needs_start, so the
+  // decision has to give way rather than the write failing.
+  test("losing the date drops a published row back", () => {
+    expect(settleStatus("published", fresh, true, null).status).toBe("pending");
+  });
+
+  test("no longer an event drops a published row back", () => {
+    const reject = { status: "rejected", rejectedReason: "not an event" } as const;
+    expect(settleStatus("published", reject, false, date)).toEqual(reject);
   });
 });

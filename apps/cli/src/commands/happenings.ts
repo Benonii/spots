@@ -37,6 +37,7 @@ import {
   route,
   buildPrompt,
   addisDate,
+  settleStatus,
   type HappeningExtraction,
 } from "../happenings-extraction.ts";
 import { fetchChannelPage, type TelegramPost } from "../lib/telegram.ts";
@@ -258,6 +259,7 @@ const extract = defineCommand({
         messageId: schema.happenings.sourceMessageId,
         rawText: schema.happenings.rawText,
         postedAt: schema.happenings.postedAt,
+        status: schema.happenings.status,
       })
       .from(schema.happenings)
       .$dynamic();
@@ -311,6 +313,8 @@ const extract = defineCommand({
             const endsAt = parseEventDate(object.endsAt, now);
             const routed = route(object, startsAt, endsAt, now, publishAbove);
 
+            const verdict = settleStatus(post.status, routed, object.isEvent, startsAt);
+
             await db
               .update(schema.happenings)
               .set({
@@ -326,18 +330,18 @@ const extract = defineCommand({
                 tags: object.tags,
                 confidence: object.confidence.toString(),
                 extractedAt: now,
-                status: routed.status,
-                rejectedReason: routed.rejectedReason,
+                status: verdict.status,
+                rejectedReason: verdict.rejectedReason,
                 updatedAt: now,
               })
               .where(eq(schema.happenings.id, post.id));
 
-            tally[routed.status]++;
+            tally[verdict.status as keyof typeof tally]++;
             const when = startsAt ? addisDate(startsAt) : "no date";
             const label = object.isEvent
               ? `${object.title ?? "(untitled)"} · ${when} · ${object.confidence.toFixed(2)} · ${object.tags.join("/") || "untagged"}`
               : "(not an event)";
-            consola.log(`  ${post.messageId} ${routed.status.padEnd(9)} ${label}`);
+            consola.log(`  ${post.messageId} ${verdict.status.padEnd(9)} ${label}`);
           } catch (error) {
             tally.failed++;
             // Stamp anyway. Every billed stage in this pipeline records the
