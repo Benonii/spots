@@ -1,5 +1,8 @@
 /**
- * `spots happenings poll` — Telegram channel → happenings (raw, unextracted).
+ * `spots happenings` — Telegram channel → happenings.
+ *
+ *   poll     fetch raw posts (free)
+ *   extract  LLM → structured event fields + routing (billed)
  *
  * Walks a channel's public preview page backwards until it reaches posts it
  * already has, inserting each new one with `status = 'pending'` and no
@@ -15,9 +18,20 @@
  */
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { and, eq, inArray } from "drizzle-orm";
+import { generateObject } from "ai";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import pLimit from "p-limit";
 import type { NewHappening } from "@spots/db";
 import { db, schema } from "../db.ts";
+import { getModel } from "../lib/llm.ts";
+import {
+  happeningExtractionSchema,
+  EXTRACTION_SYSTEM,
+  parseEventDate,
+  route,
+  buildPrompt,
+  addisDate,
+} from "../happenings-extraction.ts";
 import { fetchChannelPage, type TelegramPost } from "../lib/telegram.ts";
 import { sleep, jitter } from "../lib/throttle.ts";
 
@@ -176,7 +190,169 @@ const poll = defineCommand({
   },
 });
 
+const CONCURRENCY = 4;
+
+const extract = defineCommand({
+  meta: {
+    name: "extract",
+    description: "LLM: pull event details out of polled posts (billed)",
+  },
+  args: {
+    limit: { type: "string", description: "Max posts to process" },
+    all: {
+      type: "boolean",
+      description: "Re-extract every post (after a prompt change) — re-bills",
+    },
+    "retry-failed": {
+      type: "boolean",
+      description: "Re-extract only posts whose previous extraction errored",
+    },
+    "publish-above": {
+      type: "string",
+      description:
+        "Auto-publish dated future events at or above this confidence (0..1). Omitted = everything goes to review.",
+    },
+  },
+  async run({ args }) {
+    const limit = args.limit ? Number(args.limit) : undefined;
+    if (limit !== undefined && (Number.isNaN(limit) || limit <= 0)) {
+      consola.error("--limit must be a positive number");
+      process.exitCode = 1;
+      return;
+    }
+
+    // No default threshold on purpose. Picking one before there is a sample to
+    // calibrate against would be inventing a number, and the cost of getting it
+    // wrong is a wrong event in front of users. Until it's set, every event
+    // waits for a human.
+    const publishAbove =
+      args["publish-above"] !== undefined ? Number(args["publish-above"]) : null;
+    if (
+      publishAbove !== null &&
+      (Number.isNaN(publishAbove) || publishAbove < 0 || publishAbove > 1)
+    ) {
+      consola.error("--publish-above must be between 0 and 1");
+      process.exitCode = 1;
+      return;
+    }
+
+    const model = getModel(); // validates LLM_MODEL + key before spending
+
+    let query = db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        rawText: schema.happenings.rawText,
+        postedAt: schema.happenings.postedAt,
+      })
+      .from(schema.happenings)
+      .$dynamic();
+
+    if (args["retry-failed"]) {
+      // A failed extraction is stamped but wrote no verdict, so `is_event is
+      // null` after `extracted_at` is set is exactly the errored set.
+      query = query.where(
+        and(
+          sql`${schema.happenings.extractedAt} is not null`,
+          isNull(schema.happenings.isEvent),
+        ),
+      );
+    } else if (!args.all) {
+      query = query.where(isNull(schema.happenings.extractedAt));
+    }
+    query = query.orderBy(sql`${schema.happenings.sourceMessageId} desc`);
+    if (limit !== undefined) query = query.limit(limit);
+
+    const posts = await query;
+    if (!posts.length) {
+      consola.info("Nothing to extract.");
+      return;
+    }
+
+    consola.info(
+      `Extracting ${posts.length} posts (concurrency ${CONCURRENCY})…${
+        publishAbove === null
+          ? " Everything routes to review — pass --publish-above to auto-publish."
+          : ` Auto-publishing at confidence ≥ ${publishAbove}.`
+      }`,
+    );
+
+    const run = pLimit(CONCURRENCY);
+    const tally = { published: 0, pending: 0, rejected: 0, failed: 0 };
+
+    await Promise.all(
+      posts.map((post) =>
+        run(async () => {
+          const now = new Date();
+          try {
+            const { object } = await generateObject({
+              model,
+              schema: happeningExtractionSchema,
+              temperature: 0,
+              system: EXTRACTION_SYSTEM,
+              prompt: buildPrompt(post.postedAt, post.rawText),
+            });
+
+            const startsAt = parseEventDate(object.startsAt, now);
+            const endsAt = parseEventDate(object.endsAt, now);
+            const routed = route(object, startsAt, endsAt, now, publishAbove);
+
+            await db
+              .update(schema.happenings)
+              .set({
+                isEvent: object.isEvent,
+                title: object.title,
+                summary: object.summary,
+                venueName: object.venueName,
+                startsAt,
+                endsAt,
+                priceMin: object.priceMin?.toString() ?? null,
+                priceMax: object.priceMax?.toString() ?? null,
+                ticketUrl: object.ticketUrl,
+                confidence: object.confidence.toString(),
+                extractedAt: now,
+                status: routed.status,
+                rejectedReason: routed.rejectedReason,
+                updatedAt: now,
+              })
+              .where(eq(schema.happenings.id, post.id));
+
+            tally[routed.status]++;
+            const when = startsAt ? addisDate(startsAt) : "no date";
+            const label = object.isEvent
+              ? `${object.title ?? "(untitled)"} · ${when} · ${object.confidence.toFixed(2)}`
+              : "(not an event)";
+            consola.log(`  ${post.messageId} ${routed.status.padEnd(9)} ${label}`);
+          } catch (error) {
+            tally.failed++;
+            // Stamp anyway. Every billed stage in this pipeline records the
+            // attempt so a re-run can't silently re-spend on the same row; the
+            // deliberate retry path is --retry-failed, which finds these by
+            // their absent verdict.
+            await db
+              .update(schema.happenings)
+              .set({ extractedAt: now, updatedAt: now })
+              .where(eq(schema.happenings.id, post.id));
+            const reason =
+              (error instanceof Error ? error.message : String(error))
+                .trim()
+                .split("\n")
+                .filter(Boolean)
+                .pop() ?? "unknown error";
+            consola.warn(`  ${post.messageId} failed: ${reason}`);
+          }
+        }),
+      ),
+    );
+
+    consola.success(
+      `Extracted ${posts.length}: ${tally.published} published, ${tally.pending} to review, ${tally.rejected} rejected, ${tally.failed} failed`,
+    );
+    if (tally.failed) process.exitCode = 1;
+  },
+});
+
 export const happeningsCommand = defineCommand({
   meta: { name: "happenings", description: "Events scraped from Telegram" },
-  subCommands: { poll },
+  subCommands: { poll, extract },
 });
