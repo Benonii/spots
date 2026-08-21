@@ -5,12 +5,22 @@
 -- against when deciding whether a newly-seen venue is one we already have — so
 -- the link has to stay and only the button goes.
 --
--- Journal `when` must be greater than every entry already applied. drizzle
--- compares only against the newest applied timestamp — not `idx`, not a set of
--- hashes — so a stale one makes `db:migrate` exit 0 having done nothing. This
--- entry was first dated 1787100000000, below 0024's real 1787301007578, and was
--- silently skipped; it is now 1787400000000. The same rule binds at merge time:
--- this migration must reach main before any migration dated after it.
+-- Journal `when` must be greater than the high-water mark in
+-- drizzle.__drizzle_migrations at the moment the run starts. drizzle reads the
+-- newest applied created_at ONCE before its loop (pg-core/dialect.js:59-62) and
+-- never updates it while iterating, so entries apply in journal-array order and
+-- every one is compared against that same pre-run value. It does not look at
+-- `idx`, does not mind gaps, and does not error on a stale timestamp — it exits
+-- 0 having done nothing.
+--
+-- Two consequences. Entries merged together before a single migrate run all
+-- apply regardless of their order relative to each other. But an entry dated
+-- below a value some earlier run already applied is skipped for ever.
+--
+-- This entry was first dated 1787100000000, below 0024's real 1787301007578,
+-- and was silently skipped on a clean run; it is now 1787400000000. Before
+-- adding the next one, read the current high-water and beat it — reaching for a
+-- round number is how both this migration and 0026 broke, an hour apart.
 --
 -- Deliberately not a locked_field: it's a curation flag about our own data
 -- quality, not one of the scrape-owned columns an upsert could revert.
