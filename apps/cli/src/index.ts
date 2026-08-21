@@ -17,6 +17,7 @@ import { geocodeCommand } from "./commands/geocode.ts";
 import { upsertCommand } from "./commands/upsert.ts";
 import { coversCommand } from "./commands/covers.ts";
 import { ingestCommand } from "./commands/ingest.ts";
+import { happeningsCommand } from "./commands/happenings.ts";
 import { analyticsCommand } from "./commands/analytics.ts";
 import { adminCommand } from "./commands/admin.ts";
 import { backupCommand } from "./commands/backup.ts";
@@ -39,6 +40,7 @@ const main = defineCommand({
     geocode: geocodeCommand,
     upsert: upsertCommand,
     covers: coversCommand,
+    happenings: happeningsCommand,
     ingest: ingestCommand,
     analytics: analyticsCommand,
     admin: adminCommand,

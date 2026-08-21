@@ -1,0 +1,54 @@
+# Scheduled Telegram poll for `happenings`.
+#
+# This runs in CI rather than on a laptop because a third of the events in this
+# channel are announced same-day or next-day (measured over 96 posts), so a
+# machine that sleeps for two days loses them for good — the catch-up walk still
+# fetches those posts, it just fetches them already expired.
+#
+# The TikTok pipeline (`spots ingest`) must NOT move here: TikTok blocks
+# datacenter IPs, which is why architecture.md pins it to a residential
+# connection. Telegram serves public HTML with no auth and no rate limiting, so
+# only this half is safe to run from a GitHub runner.
+#
+# DATABASE_URL is the least-privilege `spots_poller` login (drizzle/0023), not
+# the CLI connection string — it can reach the happenings table and nothing
+# else. Never add a `pull_request` trigger: this repo is public, and that is the
+# one trigger that would expose the secret to forks.
+
+name: Poll happenings
+
+on:
+  schedule:
+    # 07:00 and 18:00 in Addis (UTC+3). Two runs rather than one because of the
+    # same-day announcements; more than that just re-reads a channel that posts
+    # about six times a day.
+    - cron: "0 4 * * *"
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poll-happenings
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # SHA-pinned, not tag-pinned: a DB secret is in scope and the repo is
+      # public, so a hijacked action tag is the realistic path to it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.12
+
+      - run: bun install --frozen-lockfile
+
+      - name: Poll Telegram
+        env:
+          DATABASE_URL: ${{ secrets.POLLER_DATABASE_URL }}
+        run: bun run spots happenings poll

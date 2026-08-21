@@ -733,6 +733,143 @@ export const sourceVideos = pgTable(
 ).enableRLS(); // RLS on, no policy => CLI-only
 
 /* ------------------------------------------------------------------ */
+/* happenings — time-bound events scraped from Telegram                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Concerts, pop-ups, screenings, exhibitions — things that expire.
+ *
+ * Deliberately NOT in `spots`: a spot is a permanent venue and is never
+ * filtered by date, whereas a happening is worthless the day after it runs.
+ * The 12 event-tagged rows currently sitting in `spots` are that mistake.
+ * Also deliberately not named `events` — that name belongs to the analytics
+ * stream (insert-only, no select policy), so a product table called `events`
+ * would be unreadable by the app.
+ *
+ * Source is the public Telegram preview page (t.me/s/<channel>) — no API key,
+ * no bot membership, and none of TikTok's rate-limit hostility. One row per
+ * message, inserted raw first and enriched by a separate extraction stage, so
+ * the scrape is free to re-run and only the LLM stage costs money.
+ *
+ * Lifecycle: pending -> published | rejected. Nothing reaches the app until a
+ * human (or a high-confidence extraction) moves it to 'published'.
+ */
+export const happenings = pgTable(
+  "happenings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // ── source (set by the poller) ────────────────────────────────────────
+    // channel handle without the '@', lowercased: 'linkupaddis'. Kept as a
+    // plain string rather than a channels FK: `channels` is TikTok-shaped and
+    // its rows feed the video pipeline's work-lists.
+    sourceChannel: text("source_channel").notNull(),
+    // Telegram's per-channel message id. Monotonic, so it doubles as the
+    // pagination cursor (t.me/s/<channel>?before=<id>).
+    sourceMessageId: bigint("source_message_id", { mode: "number" }).notNull(),
+    sourceUrl: text("source_url").notNull(), // https://t.me/linkupaddis/12889
+    rawText: text("raw_text").notNull(), // the post verbatim, for re-extraction
+    imageUrl: text("image_url"), // the post's photo, if it has one
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+
+    // ── extraction (set by the LLM stage; all null until it runs) ─────────
+    title: text("title"),
+    summary: text("summary"),
+    venueName: text("venue_name"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    priceMin: numeric("price_min"),
+    priceMax: numeric("price_max"),
+    priceCurrency: text("price_currency").notNull().default("ETB"),
+    ticketUrl: text("ticket_url"),
+    // The channel posts plenty of non-events (job ads, course announcements,
+    // news). This is the gate that keeps them out, separate from `confidence`:
+    // a post can be confidently not-an-event.
+    isEvent: boolean("is_event"),
+    confidence: numeric("confidence"), // 0..1, drives auto-publish vs review
+    // null = the extraction stage hasn't run. Stamped even when extraction
+    // fails, so a re-run never re-bills the same post. Same rule as
+    // comments_scraped_at / normalized_at / geocoded_at on source_videos.
+    extractedAt: timestamp("extracted_at", { withTimezone: true }),
+
+    // Set when the venue is already in the catalog — "jazz night at a place
+    // you already saved" is the thing a plain Telegram mirror can't do.
+    spotId: uuid("spot_id").references(() => spots.id, { onDelete: "set null" }),
+
+    // ── review ───────────────────────────────────────────────────────────
+    status: text("status").notNull().default("pending"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: text("reviewed_by"), // admin auth.uid(), or null when auto-published
+    rejectedReason: text("rejected_reason"),
+
+    scrapedAt: timestamp("scraped_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // Dedup key. Message ids are only unique within a channel, so the pair is
+    // what makes a re-poll idempotent.
+    uniqueIndex("happenings_source_idx").on(t.sourceChannel, t.sourceMessageId),
+    // The app's only query: published, not yet over, soonest first.
+    index("happenings_upcoming_idx")
+      .on(t.startsAt)
+      .where(sql`status = 'published'`),
+    // Extraction work-list — posts the LLM stage hasn't seen.
+    index("happenings_unextracted_idx")
+      .on(t.extractedAt)
+      .where(sql`extracted_at is null`),
+    // Review queue.
+    index("happenings_status_idx").on(t.status),
+    check(
+      "happenings_status_check",
+      sql`${t.status} in ('pending','published','rejected')`,
+    ),
+    check("happenings_confidence_check", sql`${t.confidence} between 0 and 1`),
+    // The correctness property the whole feature rests on: an undated event
+    // can never go live, because the app filters on starts_at and a null would
+    // silently drop out of both the upcoming and the expired side. Enforced
+    // here rather than in the publish path so no future caller can skip it.
+    check(
+      "happenings_published_needs_start",
+      sql`${t.status} <> 'published' or ${t.startsAt} is not null`,
+    ),
+    // Public reads see published happenings only — including ones already past,
+    // which the app filters by date. Expiry is a query predicate, not a status.
+    pgPolicy("public read happenings", {
+      for: "select",
+      to: [anonRole, authenticatedRole],
+      using: sql`${t.status} = 'published'`,
+    }),
+    // Admins additionally see pending/rejected rows. Writes stay CLI-only: the
+    // review queue is a CLI command, so there is no insert/update policy here.
+    pgPolicy("admins read all happenings", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`is_admin()`,
+    }),
+    // The scheduled poller runs in CI under a least-privilege login rather than
+    // the RLS-bypassing CLI connection, so it needs policies of its own —
+    // scoped to exactly what the poll command does: read the dedup key, insert
+    // pending rows. A leaked POLLER_DATABASE_URL therefore can't touch
+    // published content. See drizzle/0023_poller_role.sql (creates the role;
+    // password set out of band) and 0024_tighten_poller.sql (this shape).
+    pgPolicy("poller reads happenings", {
+      for: "select",
+      to: "spots_poller",
+      using: sql`true`,
+    }),
+    pgPolicy("poller inserts pending happenings", {
+      for: "insert",
+      to: "spots_poller",
+      withCheck: sql`${t.status} = 'pending'`,
+    }),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* relations (typed joins)                                             */
 /* ------------------------------------------------------------------ */
 
@@ -742,6 +879,13 @@ export const channelsRelations = relations(channels, ({ many }) => ({
 
 export const spotsRelations = relations(spots, ({ many }) => ({
   videos: many(sourceVideos),
+}));
+
+export const happeningsRelations = relations(happenings, ({ one }) => ({
+  spot: one(spots, {
+    fields: [happenings.spotId],
+    references: [spots.id],
+  }),
 }));
 
 export const sourceVideosRelations = relations(sourceVideos, ({ one }) => ({
@@ -767,6 +911,9 @@ export type NewSpot = typeof spots.$inferInsert;
 
 export type SourceVideo = typeof sourceVideos.$inferSelect;
 export type NewSourceVideo = typeof sourceVideos.$inferInsert;
+
+export type Happening = typeof happenings.$inferSelect;
+export type NewHappening = typeof happenings.$inferInsert;
 
 export type Visit = typeof visits.$inferSelect;
 export type NewVisit = typeof visits.$inferInsert;

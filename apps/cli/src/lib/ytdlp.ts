@@ -31,6 +31,19 @@ type FlatEntry = { id?: string; url?: string; webpage_url?: string };
 const bin = () => getEnv().YT_DLP_BIN;
 
 /**
+ * Required on every TikTok request. Without a Referer, TikTok's Akamai layer
+ * serves a WAF challenge stub instead of the page: profile listings 403 and
+ * video pages fail to extract, which took the whole pipeline down from
+ * 2026-08-10. The value only has to be present — tiktok.com is used because a
+ * same-origin referrer is the least anomalous thing to send.
+ *
+ * Remove this only once yt-dlp ships the header itself (PR #17437, unmerged as
+ * of 2026-08-17) — a bare `--referer` looks arbitrary, but deleting it silently
+ * breaks all scraping. See yt-dlp issue #17403.
+ */
+const REFERER = ["--referer", "https://www.tiktok.com/"] as const;
+
+/**
  * Retry a yt-dlp call on failure. TikTok's extractor is intermittently flaky
  * (transient rejects, "unable to extract universal data for rehydration"); the
  * same request usually succeeds on a later attempt. Backoff grows per attempt.
@@ -63,6 +76,7 @@ export async function enumerateChannel(
   return withRetry(async () => {
     const { stdout } = await run([
       bin(),
+      ...REFERER,
       "--flat-playlist",
       "--dump-single-json",
       "--no-warnings",
@@ -83,6 +97,7 @@ export async function fetchVideo(url: string, retries = 2): Promise<RawVideo> {
   return withRetry(async () => {
     const { stdout } = await run([
       bin(),
+      ...REFERER,
       "--skip-download",
       "--dump-json",
       "--no-warnings",
