@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Happening } from "../lib/types";
 import {
   calendarUrl,
@@ -90,7 +90,13 @@ export function EventCard({
       <div className="spotcard eventcard" {...swipe.cardProps}>
         <a
           className="spot-cover"
-          style={{ backgroundImage: flyerGradient(happening.id) }}
+          style={
+            {
+              backgroundImage: flyerGradient(happening.id),
+              // fills the space the uncropped poster leaves, blurred (see CSS)
+              "--flyer": happening.image_url ? `url("${happening.image_url}")` : "none",
+            } as CSSProperties
+          }
           href={happening.source_url}
           target="_blank"
           rel="noreferrer"
