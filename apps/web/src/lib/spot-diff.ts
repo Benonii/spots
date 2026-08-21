@@ -10,6 +10,7 @@ export type SpotDraft = {
   name: string;
   description: string;
   mapUrl: string;
+  hideMap: boolean;
   tiktokUrl: string; // optional → spots.source_video_url (Watch button + clickable cover)
   lat: number | null;
   lng: number | null;
@@ -64,6 +65,8 @@ export function diffSpot(
   }
   const mapUrl = draft.mapUrl.trim() || null;
   if (mapUrl !== (spot.map_url ?? null)) patch.map_url = mapUrl; // not scrape-owned; no lock needed
+  // Curation flag about our data quality, not a scrape-owned field — no lock.
+  if (draft.hideMap !== (spot.hide_map ?? false)) patch.hide_map = draft.hideMap;
   const tiktok = draft.tiktokUrl.trim() || null;
   if (tiktok !== (spot.source_video_url ?? null)) {
     patch.source_video_url = tiktok;

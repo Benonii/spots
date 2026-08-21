@@ -38,6 +38,7 @@ const draftOf = (s: Spot): SpotDraft => ({
   name: s.name,
   description: s.summary ?? "",
   mapUrl: s.map_url ?? "",
+  hideMap: s.hide_map ?? false,
   tiktokUrl: s.source_video_url ?? "",
   lat: s.lat,
   lng: s.lng,
@@ -92,6 +93,27 @@ describe("diffSpot", () => {
     const { patch, changed } = diffSpot(base, { ...draftOf(base), mapUrl: "https://maps.app.goo.gl/q" });
     expect(patch.map_url).toBe("https://maps.app.goo.gl/q");
     expect(changed.size).toBe(0); // map_url isn't scrape-owned, so it isn't locked
+  });
+
+  // The Maps link is what we match against to catch duplicate venues, so a bad
+  // one gets its button hidden rather than the link cleared.
+  test("hiding the map button leaves the link alone", () => {
+    const { patch, changed } = diffSpot(base, { ...draftOf(base), hideMap: true });
+    expect(patch).toEqual({ hide_map: true });
+    expect(patch.map_url).toBeUndefined();
+    // not scrape-owned, so it must not enter locked_fields
+    expect(changed.size).toBe(0);
+  });
+
+  test("un-hiding is just as much a change as hiding", () => {
+    const hidden: Spot = { ...base, hide_map: true };
+    const { patch } = diffSpot(hidden, { ...draftOf(hidden), hideMap: false });
+    expect(patch).toEqual({ hide_map: false });
+  });
+
+  test("a spot that never had the flag reads as visible", () => {
+    const { patch } = diffSpot(base, draftOf(base));
+    expect(patch.hide_map).toBeUndefined();
   });
 
   test("editing tags locks 'tags'", () => {

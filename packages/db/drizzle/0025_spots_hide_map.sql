@@ -1,0 +1,30 @@
+-- Hide the "Map" button on a spot without losing its Maps link.
+--
+-- Some scraped spots carry a map_url that points at the wrong place. Clearing
+-- the column would be the obvious fix, but those links are what we dedupe
+-- against when deciding whether a newly-seen venue is one we already have — so
+-- the link has to stay and only the button goes.
+--
+-- Journal `when` must be greater than the high-water mark in
+-- drizzle.__drizzle_migrations at the moment the run starts. drizzle reads the
+-- newest applied created_at ONCE before its loop (pg-core/dialect.js:59-62) and
+-- never updates it while iterating, so entries apply in journal-array order and
+-- every one is compared against that same pre-run value. It does not look at
+-- `idx`, does not mind gaps, and does not error on a stale timestamp — it exits
+-- 0 having done nothing.
+--
+-- Two consequences. Entries merged together before a single migrate run all
+-- apply regardless of their order relative to each other. But an entry dated
+-- below a value some earlier run already applied is skipped for ever.
+--
+-- This entry was first dated 1787100000000, below 0024's real 1787301007578,
+-- and was silently skipped on a clean run. It was re-dated to 1787400000000,
+-- then to 1787600000000 when 0026 reached prod first and moved the high-water
+-- to 1787500000000 — the value has to beat prod, not merely the file next to
+-- it. Before adding the next one, read the current high-water and beat it;
+-- reaching for a round number is how both this migration and 0026 broke.
+--
+-- Deliberately not a locked_field: it's a curation flag about our own data
+-- quality, not one of the scrape-owned columns an upsert could revert.
+
+ALTER TABLE "spots" ADD COLUMN "hide_map" boolean DEFAULT false NOT NULL;

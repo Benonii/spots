@@ -448,9 +448,13 @@ export function SpotCard({
               <TikTokIcon /> Watch
             </a>
           )}
-          <a className="action-btn" href={mapsUrl(spot)} target="_blank" rel="noreferrer">
-            <MapPinIcon /> Map
-          </a>
+          {/* A super can suppress this when the spot's Maps link points somewhere
+              wrong; the link itself stays, since dedup matches against it. */}
+          {!spot.hide_map && (
+            <a className="action-btn" href={mapsUrl(spot)} target="_blank" rel="noreferrer">
+              <MapPinIcon /> Map
+            </a>
+          )}
           <button
             className={"action-btn save-btn" + (isSaved ? " on" : "")}
             onClick={onToggleSaved}
