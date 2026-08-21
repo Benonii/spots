@@ -850,6 +850,24 @@ export function App() {
       return next;
     });
 
+  /**
+   * Same idea as the spots dice, minus the "skip what you've been to" step —
+   * an event happens once, so there's no visited set to avoid. It does refuse
+   * to land on the card already showing, which a plain random pick does about
+   * one time in N and reads as the button being broken.
+   */
+  const surpriseEvent = useCallback(() => {
+    if (!events.length) return;
+    void track("surprise_event");
+    if (events.length === 1) {
+      setEventIndex(0);
+      return;
+    }
+    let pick = eventIndex;
+    while (pick === eventIndex) pick = Math.floor(Math.random() * events.length);
+    setEventIndex(pick);
+  }, [events, eventIndex]);
+
   const clearEventFilters = () => {
     setEventQuery("");
     setEventWhen("upcoming");
@@ -1132,6 +1150,13 @@ export function App() {
                 ariaLabel="When"
               />
             </div>
+            <div className="ctrl-spacer" />
+            {/* plain .surprise-wrap, not the desktop/mobile pair the spots bar
+                uses: the events controls don't collapse, so one button serves
+                every width */}
+            <span className="surprise-wrap">
+              <DiceButton onClick={surpriseEvent} />
+            </span>
           </section>
 
           <section className="cat-chips event-chips">
