@@ -199,6 +199,7 @@ export function App() {
   const [eventWhen, setEventWhen] = useState<EventWhen>("upcoming");
   const [eventKinds, setEventKinds] = useState<Set<string>>(new Set());
   const [eventFreeOnly, setEventFreeOnly] = useState(false);
+  const [eventsFailed, setEventsFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
@@ -786,7 +787,9 @@ export function App() {
     if (deck !== "events" || happenings) return;
     fetchHappenings()
       .then(setHappenings)
-      .catch(() => setHappenings([]));
+      // Failing into an empty array would render "nothing on yet" — a broken
+      // query and a quiet week must not look the same.
+      .catch(() => setEventsFailed(true));
   }, [deck, happenings]);
 
   // Same Fuse instance policy as spots: loaded on the first keystroke, with a
@@ -1106,7 +1109,7 @@ export function App() {
       </section>
       )}
 
-      {deck === "events" && (
+      {deck === "events" && !eventsFailed && (
         <>
           <section className="controls event-controls">
             <div className="ctrl ctrl-search">
@@ -1154,7 +1157,11 @@ export function App() {
       )}
 
       {deck === "events" ? (
-        !happenings ? (
+        eventsFailed ? (
+          <div className="noresults">
+            Couldn't load events. Check your connection and try again.
+          </div>
+        ) : !happenings ? (
           <div className="spot-stage">
             <SkeletonCard />
           </div>
