@@ -147,9 +147,9 @@ export const upsertCommand = defineCommand({
 
       // On conflict, refresh scrape-owned fields but defer to admin edits on the
       // six curatable logical fields (name, description, location, tags, price,
-      // map). Columns absent here — owner_id, source, hidden, locked_fields,
-      // created_by, updated_by, map_url — are never written by the scrape, so
-      // curation state is preserved automatically.
+      // map). Columns absent here — owner_id, source, hidden, hide_map,
+      // locked_fields, created_by, updated_by, map_url — are never written by
+      // the scrape, so curation state is preserved automatically.
       const setOnConflict = {
         name: keepIfLocked("name", schema.spots.name, "name"),
         summary: keepIfLocked("description", schema.spots.summary, "summary"),
