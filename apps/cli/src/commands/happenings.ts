@@ -78,6 +78,10 @@ const poll = defineCommand({
       type: "string",
       description: `Max pages to walk back (default ${DEFAULT_MAX_PAGES}, 20 posts each)`,
     },
+    backfill: {
+      type: "boolean",
+      description: "Keep walking past posts we already have, to --pages depth",
+    },
   },
   async run({ args }) {
     const channel = normalizeChannel(args.channel ?? DEFAULT_CHANNEL);
@@ -176,7 +180,10 @@ const poll = defineCommand({
       // page: photo-only posts are never inserted, so a page made entirely of
       // them has nothing new by definition and would end the walk early —
       // truncating a backfill that hasn't actually caught up yet.
-      if (usable.length && !fresh.length) break;
+      //
+      // --backfill is the deliberate opposite: reaching into history means
+      // walking straight through the posts we already hold.
+      if (!args.backfill && usable.length && !fresh.length) break;
 
       before = Math.min(...posts.map((post) => post.messageId));
       await sleep(jitter(2000, 5000));
@@ -316,6 +323,7 @@ const extract = defineCommand({
                 priceMin: object.priceMin?.toString() ?? null,
                 priceMax: object.priceMax?.toString() ?? null,
                 ticketUrl: object.ticketUrl,
+                tags: object.tags,
                 confidence: object.confidence.toString(),
                 extractedAt: now,
                 status: routed.status,
@@ -327,7 +335,7 @@ const extract = defineCommand({
             tally[routed.status]++;
             const when = startsAt ? addisDate(startsAt) : "no date";
             const label = object.isEvent
-              ? `${object.title ?? "(untitled)"} · ${when} · ${object.confidence.toFixed(2)}`
+              ? `${object.title ?? "(untitled)"} · ${when} · ${object.confidence.toFixed(2)} · ${object.tags.join("/") || "untagged"}`
               : "(not an event)";
             consola.log(`  ${post.messageId} ${routed.status.padEnd(9)} ${label}`);
           } catch (error) {

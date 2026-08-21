@@ -20,6 +20,7 @@ const event = (over: Partial<HappeningExtraction> = {}): HappeningExtraction => 
   priceMin: 700,
   priceMax: null,
   ticketUrl: "https://afromile.com/x",
+  tags: ["music"],
   confidence: 0.95,
   ...over,
 });

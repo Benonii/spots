@@ -176,6 +176,13 @@
       "when": 1787301007578,
       "tag": "0024_tighten_poller",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0026_happening_tags",
+      "breakpoints": true
     }
   ]
 }

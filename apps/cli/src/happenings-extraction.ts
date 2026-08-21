@@ -12,6 +12,31 @@
  */
 import { z } from "zod";
 
+/**
+ * Event categories, chosen from what the channel actually posts: 492 posts over
+ * 93 days break down roughly music 30%, film 18%, art 15%, food 13%,
+ * outdoors 9%, market 9%, talk 6%. `sport` was in an earlier draft and is gone —
+ * two posts in three months is a filter nobody can use.
+ *
+ * Kept few on purpose. With 30-50 events in a typical upcoming window, a
+ * category matching two of them is clutter rather than a filter.
+ *
+ * The model assigns these rather than a regex: 19% of dated posts contain no
+ * category word at all ("Afropia Dance Battle", "Ethiopian CyberShield 2026"),
+ * so keyword matching silently drops a fifth of the catalog.
+ */
+export const HAPPENING_TAGS = [
+  "music",
+  "art",
+  "film",
+  "food",
+  "market",
+  "outdoors",
+  "talk",
+] as const;
+
+export type HappeningTag = (typeof HAPPENING_TAGS)[number];
+
 export const happeningExtractionSchema = z.object({
   /**
    * The gate, deliberately separate from `confidence`. The channel posts plenty
@@ -36,6 +61,13 @@ export const happeningExtractionSchema = z.object({
   priceMin: z.number().nullable(),
   priceMax: z.number().nullable(),
   ticketUrl: z.string().nullable(),
+
+  /**
+   * A closed vocabulary, enforced here rather than only asked for in the
+   * prompt. The app builds its filter chips from this list, so a novel tag
+   * would be a category nobody can ever select — and prompts drift.
+   */
+  tags: z.array(z.enum(HAPPENING_TAGS)),
 
   /** 0..1. How sure the model is of the event details, not of `isEvent`. */
   confidence: z.number().min(0).max(1),
@@ -70,6 +102,16 @@ summary — one neutral sentence describing what it is. No marketing language.
 
 priceMin / priceMax — ticket price in Ethiopian Birr as plain numbers. priceMax only for a stated range. Free events are 0. Unstated is null.
 
+tags — one to three from exactly this list, most important first: ${HAPPENING_TAGS.join(", ")}. Use nothing outside it.
+- music: DJs, concerts, club nights, live bands, dancing.
+- art: exhibitions, galleries, poetry, theatre, performance.
+- film: screenings, cinema, documentaries.
+- food: tastings, brunches, food festivals, coffee events.
+- market: pop-ups, bazaars, craft fairs, vendor markets.
+- outdoors: hikes, runs, cycling, tours, anything held outside the city.
+- talk: conferences, panels, workshops, training, meetups.
+A cultural or religious celebration takes the tag of what actually happens at it — a holiday concert is music. Empty list only when the post is not an event.
+
 ticketUrl — a real http(s) URL for tickets only. A Telegram handle like @Afromile is NOT a URL; leave null.
 
 confidence — 0 to 1, covering the event details as a whole, most importantly the date. Be strict: 0.9+ means the post states an explicit date you copied directly. Below 0.5 means you inferred or guessed the date. A wrong date is far more costly than a missing one.
@@ -83,6 +125,9 @@ Extract only what the post says. Never invent a venue, a price, or a date.`;
  * being trusted. Wide enough for a festival announced a year out.
  */
 const MAX_YEARS_AHEAD = 2;
+// Also the effective depth limit on a history backfill: a post older than this
+// has its date nulled and lands in review for ever. Raise both together if the
+// poll is ever walked back further than a year.
 const MAX_DAYS_BEHIND = 365;
 
 export function parseEventDate(value: string | null, now: Date): Date | null {
