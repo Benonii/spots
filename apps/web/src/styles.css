@@ -764,6 +764,26 @@ a.spot-cover:hover { filter: brightness(1.06); }
    spots deck, and none of its dimensions (area, price band, sort) mean anything
    for an event. Search + when + category chips, matching the spots layout. */
 .event-controls { margin-bottom: 4px; }
+
+@media (max-width: 900px) {
+  /* The spots controls hide behind a "Search & filters" bar at this width and
+     put the dice beside it. The events controls don't collapse — there are only
+     two of them — so they stay visible and the dice pairs with the When
+     dropdown instead of being stranded on a line of its own.
+     Two rows: search across the top, When and the dice sharing the second. */
+  .event-controls {
+    display: grid; grid-template-columns: 1fr auto; gap: 14px 12px; align-items: end;
+    /* re-assert the card: the shared .controls rule strips it here, because on
+       the spots side these live inside the filter panel, which draws its own */
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+  .event-controls .ctrl-search { grid-column: 1 / -1; }
+  /* the 230px floor is what forced the wrap in the first place */
+  .event-controls .search-input { min-width: 0; width: 100%; }
+  .event-controls .ctrl-spacer { display: none; }
+  .event-controls .surprise { margin-left: 0; }
+}
 .event-chips { margin-bottom: 18px; }
 
 @media (max-width: 560px) {
