@@ -31,6 +31,7 @@ import {
   route,
   buildPrompt,
   addisDate,
+  type HappeningExtraction,
 } from "../happenings-extraction.ts";
 import { fetchChannelPage, type TelegramPost } from "../lib/telegram.ts";
 import { sleep, jitter } from "../lib/throttle.ts";
@@ -352,7 +353,99 @@ const extract = defineCommand({
   },
 });
 
+const publish = defineCommand({
+  meta: {
+    name: "publish",
+    description: "Re-route already-extracted posts at a confidence threshold (free)",
+  },
+  args: {
+    above: {
+      type: "string",
+      description: "Publish dated future events at or above this confidence (0..1)",
+      required: true,
+    },
+    "dry-run": {
+      type: "boolean",
+      description: "Show what would change without writing",
+    },
+  },
+  async run({ args }) {
+    const threshold = Number(args.above);
+    if (Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
+      consola.error("--above must be between 0 and 1");
+      process.exitCode = 1;
+      return;
+    }
+
+    // Deliberately does not call the LLM. Choosing a threshold is something you
+    // do repeatedly while calibrating, and re-running `extract --all` to change
+    // one number would re-bill the whole table for output we already have.
+    // Rows a human has already ruled on are left alone.
+    const rows = await db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        title: schema.happenings.title,
+        isEvent: schema.happenings.isEvent,
+        startsAt: schema.happenings.startsAt,
+        endsAt: schema.happenings.endsAt,
+        confidence: schema.happenings.confidence,
+        status: schema.happenings.status,
+      })
+      .from(schema.happenings)
+      .where(
+        and(
+          sql`${schema.happenings.extractedAt} is not null`,
+          isNull(schema.happenings.reviewedAt),
+        ),
+      )
+      .orderBy(sql`${schema.happenings.startsAt} asc nulls last`);
+
+    if (!rows.length) {
+      consola.info("Nothing extracted to route.");
+      return;
+    }
+
+    const now = new Date();
+    let changed = 0;
+    const tally = { published: 0, pending: 0, rejected: 0 };
+
+    for (const row of rows) {
+      const routed = route(
+        {
+          isEvent: row.isEvent ?? false,
+          confidence: Number(row.confidence ?? 0),
+        } as HappeningExtraction,
+        row.startsAt,
+        row.endsAt,
+        now,
+        threshold,
+      );
+      tally[routed.status]++;
+      if (routed.status === row.status) continue;
+      changed++;
+      consola.log(
+        `  ${row.messageId} ${row.status} → ${routed.status.padEnd(9)} ${row.title ?? "(untitled)"}`,
+      );
+      if (!args["dry-run"]) {
+        await db
+          .update(schema.happenings)
+          .set({
+            status: routed.status,
+            rejectedReason: routed.rejectedReason,
+            updatedAt: now,
+          })
+          .where(eq(schema.happenings.id, row.id));
+      }
+    }
+
+    const summary = `${tally.published} published, ${tally.pending} to review, ${tally.rejected} rejected (${changed} changed)`;
+    if (args["dry-run"]) consola.info(`Would be: ${summary}`);
+    else consola.success(summary);
+  },
+});
+
 export const happeningsCommand = defineCommand({
   meta: { name: "happenings", description: "Events scraped from Telegram" },
-  subCommands: { poll, extract },
+  subCommands: { poll, extract, publish },
 });
