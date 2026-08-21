@@ -938,7 +938,7 @@ export function App() {
             void track("events_tab");
           }}
         >
-          What's on
+          Events
           {happenings && <span className="deck-tab-count">{events.length}</span>}
         </button>
       </div>
