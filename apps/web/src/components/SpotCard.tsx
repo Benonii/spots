@@ -1,5 +1,6 @@
 import type * as Leaflet from "leaflet";
 import { useEffect, useRef, useState } from "react";
+import { useSwipeDeck } from "../lib/swipe";
 import type { Dimensions, Spot } from "../lib/types";
 import { isNewSpot } from "../lib/categories";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, coverSrcSet, mapsUrl } from "../lib/format";
@@ -253,9 +254,7 @@ export function SpotCard({
   const hasPrice = spot.price_level != null && spot.price_min != null;
   const basisLabel = spot.price_basis === "total" ? "total" : "per person";
 
-  // ----- mobile swipe (Tinder-style): drag horizontally to change spots -----
-  const [dx, setDx] = useState(0);
-  const [anim, setAnim] = useState(false);
+  // Swipe lives in lib/swipe.ts so the events deck behaves identically.
   const [hint, setHint] = useState(() => {
     try {
       return !localStorage.getItem(SWIPED_KEY);
@@ -263,83 +262,20 @@ export function SpotCard({
       return false;
     }
   });
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const axis = useRef<"none" | "h" | "v">("none");
-  const dragged = useRef(false);
-  const SWIPE_MS = 200;
-
-  const onTouchStart = (e: React.TouchEvent) => {
+  const swipe = useSwipeDeck({
+    onPrev,
+    onNext,
     // let the map handle its own touches; don't hijack panning
-    if ((e.target as HTMLElement).closest(".spot-right")) {
-      start.current = null;
-      return;
-    }
-    const t = e.touches[0]!;
-    start.current = { x: t.clientX, y: t.clientY };
-    axis.current = "none";
-    dragged.current = false;
-    setAnim(false);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!start.current) return;
-    const t = e.touches[0]!;
-    const mx = t.clientX - start.current.x;
-    const my = t.clientY - start.current.y;
-    if (axis.current === "none") {
-      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
-      axis.current = Math.abs(mx) > Math.abs(my) ? "h" : "v"; // lock to vertical = page scroll
-    }
-    if (axis.current !== "h") return;
-    dragged.current = true;
-    setDx(mx);
-  };
-
-  const onTouchEnd = () => {
-    if (!start.current || axis.current !== "h") {
-      start.current = null;
-      return;
-    }
-    start.current = null;
-    const threshold = Math.min(56, window.innerWidth * 0.14);
-    const w = window.innerWidth;
-    if (Math.abs(dx) > threshold) {
-      const next = dx < 0; // swipe left → next, swipe right → previous
-      if (hint) {
-        setHint(false);
-        try {
-          localStorage.setItem(SWIPED_KEY, "1");
-        } catch {
-          /* ignore */
-        }
+    ignoreSelector: ".spot-right",
+    onFirstSwipe: () => {
+      setHint(false);
+      try {
+        localStorage.setItem(SWIPED_KEY, "1");
+      } catch {
+        /* ignore */
       }
-      setAnim(true);
-      setDx(next ? -w : w); // fling out
-      window.setTimeout(() => {
-        if (next) onNext();
-        else onPrev();
-        setAnim(false);
-        setDx(next ? w : -w); // new card waits off the opposite edge
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            setAnim(true);
-            setDx(0); // ...and slides in
-          }),
-        );
-      }, SWIPE_MS);
-    } else {
-      setAnim(true);
-      setDx(0); // didn't pass the threshold → spring back
-    }
-  };
-
-  const swiping = anim || dx !== 0;
-  const cardStyle = swiping
-    ? {
-        transform: `translateX(${dx}px) rotate(${dx * 0.03}deg)`,
-        transition: anim ? `transform ${SWIPE_MS}ms ease` : "none",
-      }
-    : undefined;
+    },
+  });
 
   const coverChildren = (
     <>
@@ -384,24 +320,7 @@ export function SpotCard({
 
   return (
     <>
-    <div
-      className="spotcard"
-      style={cardStyle}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTransitionEnd={() => {
-        if (dx === 0) setAnim(false);
-      }}
-      onClickCapture={(e) => {
-        // a swipe just happened — swallow the trailing click so links/buttons don't fire
-        if (dragged.current) {
-          e.preventDefault();
-          e.stopPropagation();
-          dragged.current = false;
-        }
-      }}
-    >
+    <div className="spotcard" {...swipe.cardProps}>
       {spot.source_video_url ? (
         <a
           className="spot-cover"
