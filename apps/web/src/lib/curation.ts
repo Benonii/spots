@@ -99,6 +99,7 @@ export async function createSpot(
     cover_image_url: coverUrl,
     source_video_url: draft.tiktokUrl.trim() || null,
     map_url: draft.mapUrl.trim() || null,
+    hide_map: draft.hideMap,
     source: "manual",
     owner_id: userId,
     created_by: userId,

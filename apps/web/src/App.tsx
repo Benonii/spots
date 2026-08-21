@@ -1385,6 +1385,7 @@ export function App() {
           canPurge={
             editing.mode === "edit" && role === "super" && editing.spot.source !== "manual"
           }
+          canHideMap={role === "super"}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);

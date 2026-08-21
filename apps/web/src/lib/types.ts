@@ -42,6 +42,8 @@ export type Spot = {
   owner_id?: string | null;
   hidden?: boolean;
   map_url?: string | null;
+  /** Super-admin flag: keep the Maps link for deduping, drop the Maps button. */
+  hide_map?: boolean;
   locked_fields?: string[];
   updated_at?: string;
 };

@@ -1305,6 +1305,15 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 .ed-map-ok { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8125rem; font-weight: 600; color: var(--green); }
 .ed-map-warn { font-size: 0.8125rem; color: var(--accent-text); }
 
+/* super-only toggle sitting under a field's input (e.g. "hide the Map button") */
+.ed-check { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; margin-top: 2px; }
+.ed-check input {
+  flex: none; width: 15px; height: 15px; margin: 2px 0 0;
+  accent-color: var(--green); cursor: pointer;
+}
+.ed-check span { font-family: var(--serif-b); font-size: 0.8438rem; font-weight: 600; color: var(--ink); display: flex; flex-direction: column; gap: 2px; }
+.ed-check i { font-style: normal; font-weight: 400; font-size: 0.75rem; color: var(--muted); line-height: 1.45; }
+
 /* tags */
 .ed-tags {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
