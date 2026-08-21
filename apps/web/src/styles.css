@@ -742,6 +742,9 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .deck-tabs {
   display: inline-flex; gap: 4px; margin-bottom: 18px; padding: 4px;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  /* .app becomes a flex column under 900px, and a flex child stretches to the
+     full line regardless of inline-flex — which turns the pill into a bar. */
+  align-self: flex-start;
 }
 .deck-tab {
   position: relative;
@@ -761,13 +764,6 @@ a.spot-cover:hover { filter: brightness(1.06); }
    spots deck, and none of its dimensions (area, price band, sort) mean anything
    for an event. Search + when + category chips, matching the spots layout. */
 .event-controls { margin-bottom: 4px; }
-/* The dice sits at the end of the row on desktop and drops to full width on a
-   phone, where the events controls stack rather than collapsing behind a bar. */
-@media (max-width: 900px) {
-  .event-controls .surprise-wrap { width: 100%; }
-  .event-controls .surprise { width: 100%; justify-content: center; margin-left: 0; }
-  .event-controls .ctrl-spacer { display: none; }
-}
 .event-chips { margin-bottom: 18px; }
 
 @media (max-width: 560px) {
