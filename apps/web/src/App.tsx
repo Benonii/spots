@@ -2,8 +2,14 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link } from "@tanstack/react-router";
 import type Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
-import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
-import { fetchFirstSpot, fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import type { CommunityVisit, Happening, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import {
+  fetchFirstSpot,
+  fetchHappenings,
+  fetchSpots,
+} from "./lib/supabase";
+import { signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import { dedupe } from "./lib/happenings";
 import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
@@ -38,6 +44,10 @@ import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
 // Admin-only surfaces: split into on-demand chunks so regular visitors never
 // download them; fetched the moment the modal is opened.
+// The events deck is opt-in, so its card stays out of the landing bundle.
+const EventCard = lazy(() =>
+  import("./components/EventCard").then((m) => ({ default: m.EventCard })),
+);
 const SpotEditor = lazy(() =>
   import("./components/SpotEditor").then((m) => ({ default: m.SpotEditor })),
 );
@@ -173,6 +183,10 @@ export function App() {
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Which deck is on screen. Events are a peer of spots, not a side page.
+  const [deck, setDeck] = useState<"spots" | "events">("spots");
+  const [happenings, setHappenings] = useState<Happening[] | null>(null);
+  const [eventIndex, setEventIndex] = useState(0);
   const [index, setIndex] = useState(0);
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
@@ -754,6 +768,23 @@ export function App() {
     [saved, spotsById],
   );
 
+  // Fetched the first time the events tab is opened, not on page load: the
+  // spots deck is the landing view and shouldn't wait on a second query.
+  useEffect(() => {
+    if (deck !== "events" || happenings) return;
+    fetchHappenings()
+      .then(setHappenings)
+      .catch(() => setHappenings([]));
+  }, [deck, happenings]);
+
+  const events = useMemo(() => (happenings ? dedupe(happenings) : []), [happenings]);
+  const currentEvent = events[Math.min(eventIndex, Math.max(events.length - 1, 0))];
+
+  const goEvent = (delta: number) => {
+    if (!events.length) return;
+    setEventIndex((i) => (i + delta + events.length) % events.length);
+  };
+
   // jump the carousel to a specific spot (clearing filters first if it's hidden)
   const goToSpot = useCallback(
     (placeId: string) => {
@@ -856,17 +887,6 @@ export function App() {
               <span className="sk sk-count" aria-hidden="true" />
             )}
           </div>
-          <Tooltip label="What's on">
-            <Link
-              to="/happenings"
-              className="near-link"
-              aria-label="What's on"
-              onClick={() => void track("happenings_open")}
-            >
-              <CalendarIcon />
-              <span className="near-link-label">What's on</span>
-            </Link>
-          </Tooltip>
           <Tooltip label="Near me">
             <Link
               to="/near"
@@ -899,6 +919,31 @@ export function App() {
         </div>
       </header>
 
+      <div className="deck-tabs" role="tablist" aria-label="What to browse">
+        <button
+          role="tab"
+          className="deck-tab"
+          aria-selected={deck === "spots"}
+          onClick={() => setDeck("spots")}
+        >
+          Spots
+          {spots && <span className="deck-tab-count">{spots.length}</span>}
+        </button>
+        <button
+          role="tab"
+          className="deck-tab"
+          aria-selected={deck === "events"}
+          onClick={() => {
+            setDeck("events");
+            void track("events_tab");
+          }}
+        >
+          What's on
+          {happenings && <span className="deck-tab-count">{events.length}</span>}
+        </button>
+      </div>
+
+      {deck === "spots" && (
       <div className="filtermenu">
         {filtersOpen && (
           <div className="filter-scrim" onClick={() => setFiltersOpen(false)} aria-hidden="true" />
@@ -961,6 +1006,9 @@ export function App() {
       </div>
       </div>
 
+      )}
+
+      {deck === "spots" && (
       <section
         ref={chipsRef}
         className={
@@ -979,8 +1027,32 @@ export function App() {
           </button>
         ))}
       </section>
+      )}
 
-      {!spots ? (
+      {deck === "events" ? (
+        !happenings ? (
+          <div className="spot-stage">
+            <SkeletonCard />
+          </div>
+        ) : currentEvent ? (
+          <div className="spot-stage">
+            <Suspense fallback={<SkeletonCard />}>
+              <EventCard
+                happening={currentEvent}
+                index={Math.min(eventIndex, events.length - 1)}
+                total={events.length}
+                onPrev={() => goEvent(-1)}
+                onNext={() => goEvent(1)}
+              />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="noresults">
+            Nothing on the calendar yet. We list events as the city announces
+            them — most land only a few days ahead.
+          </div>
+        )
+      ) : !spots ? (
         <div className="spot-stage">
           <SkeletonCard />
         </div>
@@ -1019,6 +1091,10 @@ export function App() {
         </div>
       )}
 
+      {/* Saved spots, our visit log and the community feed are all about spots;
+          they'd be non-sequiturs under the events deck. */}
+      {deck === "spots" && (
+      <>
       {user && savedList.length > 0 && (
         <section className="saved-section">
           <div className="vs-head">
@@ -1122,6 +1198,8 @@ export function App() {
           </div>
           <CommunityTable entries={community} spotsById={spotsById} />
         </section>
+      )}
+      </>
       )}
 
       {editing && user && (

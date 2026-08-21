@@ -2,9 +2,16 @@ import { expect, test, describe } from "bun:test";
 import type { Happening } from "./types";
 import {
   addisDayKey,
+  calendarUrl,
+  countdown,
+} from "./happenings";
+import {
+  dateStamp,
   dayLabel,
   dedupe,
-  groupByDay,
+} from "./happenings";
+import {
+  flyerSrcSet,
   priceLabel,
   startOfAddisToday,
   timeLabel,
@@ -149,22 +156,67 @@ describe("dedupe", () => {
   });
 });
 
-describe("groupByDay", () => {
-  test("splits a sorted list into labelled days", () => {
-    const groups = groupByDay(
-      [
-        make({ id: "1", starts_at: "2026-08-21T19:00:00+03:00" }),
-        make({ id: "2", starts_at: "2026-08-21T22:00:00+03:00" }),
-        make({ id: "3", starts_at: "2026-08-22T19:00:00+03:00" }),
-      ],
-      NOW,
-    );
-    expect(groups.map((g) => g.label)).toEqual(["Today", "Tomorrow"]);
-    expect(groups[0]!.happenings).toHaveLength(2);
-    expect(groups[1]!.happenings).toHaveLength(1);
+describe("countdown", () => {
+  test("counts whole Addis days, not elapsed hours", () => {
+    // 9pm tonight is nine hours away but still "Today"; 9am tomorrow is closer
+    // to twelve hours away and still "Tomorrow".
+    expect(countdown("2026-08-21T21:00:00+03:00", NOW)).toBe("Today");
+    expect(countdown("2026-08-22T09:00:00+03:00", NOW)).toBe("Tomorrow");
   });
 
-  test("no events, no groups", () => {
-    expect(groupByDay([], NOW)).toEqual([]);
+  test("days, then weeks", () => {
+    expect(countdown("2026-08-24T19:00:00+03:00", NOW)).toBe("in 3 days");
+    expect(countdown("2026-08-29T19:00:00+03:00", NOW)).toBe("in a week");
+    expect(countdown("2026-09-14T19:00:00+03:00", NOW)).toBe("in 3 weeks");
+  });
+
+  // An all-day event that opened this morning is still worth showing.
+  test("something already started reads as on now", () => {
+    expect(countdown("2026-08-20T19:00:00+03:00", NOW)).toBe("On now");
+  });
+});
+
+describe("dateStamp", () => {
+  test("splits the date for the card headline", () => {
+    expect(dateStamp("2026-08-29T19:00:00+03:00")).toEqual({
+      weekday: "Sat",
+      day: "29",
+      month: "Aug",
+    });
+  });
+
+  // Midnight in Addis is the previous day in UTC — the stamp must not slip back.
+  test("a midnight event stamps its own day", () => {
+    expect(dateStamp("2026-08-22T00:00:00+03:00").day).toBe("22");
+  });
+});
+
+describe("flyerSrcSet", () => {
+  test("derives the stored WebP variants", () => {
+    expect(flyerSrcSet("https://x.supabase.co/storage/v1/object/public/spot-covers/happenings/abc.jpg"))
+      .toBe(
+        "https://x.supabase.co/storage/v1/object/public/spot-covers/happenings/abc-480.webp 480w, " +
+          "https://x.supabase.co/storage/v1/object/public/spot-covers/happenings/abc-960.webp 960w",
+      );
+  });
+
+  // A flyer still on Telegram has no variants — and is about to expire anyway.
+  test("no variants for a foreign url", () => {
+    expect(flyerSrcSet("https://cdn4.telesco.pe/file/abc")).toBeUndefined();
+    expect(flyerSrcSet(null)).toBeUndefined();
+  });
+});
+
+describe("calendarUrl", () => {
+  test("carries the title, venue and a real time window", () => {
+    const url = new URL(calendarUrl(make()));
+    expect(url.searchParams.get("text")).toBe("Static III");
+    expect(url.searchParams.get("location")).toBe("Anki Liquor");
+    expect(url.searchParams.get("dates")).toBe("20260829T160000Z/20260829T190000Z");
+  });
+
+  test("a stated end wins over the assumed three hours", () => {
+    const url = new URL(calendarUrl(make({ ends_at: "2026-08-29T23:00:00+03:00" })));
+    expect(url.searchParams.get("dates")).toBe("20260829T160000Z/20260829T200000Z");
   });
 });

@@ -33,15 +33,8 @@ const nearRoute = createRoute({
   // separate chunk: visitors landing on "/" never download the Near Me page
   component: lazyRouteComponent(() => import("./NearMe"), "NearMe"),
 });
-const happeningsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/happenings",
-  // separate chunk, same as /near: the deck is the landing page and shouldn't
-  // carry code for a page most visits never open
-  component: lazyRouteComponent(() => import("./Happenings"), "Happenings"),
-});
 const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, nearRoute, happeningsRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, nearRoute]),
 });
 
 declare module "@tanstack/react-router" {

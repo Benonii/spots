@@ -142,20 +142,6 @@ export function dedupe(happenings: Happening[]): Happening[] {
   );
 }
 
-export type DayGroup = { key: string; label: string; happenings: Happening[] };
-
-/** Chronological day groups, ready to render. Assumes input is already deduped. */
-export function groupByDay(happenings: Happening[], now = new Date()): DayGroup[] {
-  const groups: DayGroup[] = [];
-  for (const happening of happenings) {
-    const key = addisDayKey(happening.starts_at);
-    const last = groups[groups.length - 1];
-    if (last?.key === key) last.happenings.push(happening);
-    else groups.push({ key, label: dayLabel(happening.starts_at, now), happenings: [happening] });
-  }
-  return groups;
-}
-
 /**
  * Deterministic warm gradient behind a flyer — the same idea as a spot's cover
  * fallback, keyed on the event so it doesn't reshuffle between renders. Used
@@ -177,4 +163,62 @@ export function flyerGradient(id: string): string {
     hash = (hash * 31 + id.charCodeAt(index)) | 0;
   }
   return FLYER_GRADIENTS[Math.abs(hash) % FLYER_GRADIENTS.length]!;
+}
+
+/**
+ * "Today" / "Tomorrow" / "in 8 days" / "On now" — the urgency line.
+ *
+ * Counted in whole Addis days rather than elapsed hours: an event at 9pm
+ * tonight is "Today", not "in 9 hours", and one at 9am tomorrow is "Tomorrow"
+ * even though it's twelve hours away.
+ */
+export function countdown(iso: string, now = new Date()): string {
+  const day = (value: string) => Date.parse(`${addisDayKey(value)}T00:00:00Z`);
+  const days = Math.round((day(iso) - day(now.toISOString())) / 864e5);
+  if (days < 0) return "On now";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days < 7) return `in ${days} days`;
+  const weeks = Math.round(days / 7);
+  return weeks === 1 ? "in a week" : `in ${weeks} weeks`;
+}
+
+/** "SAT 29 AUG" — the date as the card's headline. */
+export function dateStamp(iso: string): { weekday: string; day: string; month: string } {
+  const d = addisClock(iso);
+  return {
+    weekday: DAYS[d.getUTCDay()]!.slice(0, 3),
+    day: String(d.getUTCDate()),
+    month: MONTHS[d.getUTCMonth()]!,
+  };
+}
+
+/**
+ * Responsive sources for a re-hosted flyer, by the same `<id>-<width>.webp`
+ * convention the CLI writes (see lib/storage.ts). Returns undefined for a flyer
+ * still pointing at Telegram — those have no variants, and they expire anyway.
+ */
+export function flyerSrcSet(imageUrl: string | null): string | undefined {
+  if (!imageUrl?.endsWith(".jpg")) return undefined;
+  const stem = imageUrl.slice(0, -4);
+  return `${stem}-480.webp 480w, ${stem}-960.webp 960w`;
+}
+
+/**
+ * A Google Calendar "add event" link. No file download, no library, works on
+ * mobile — and it's the single most useful thing you can do with an event once
+ * you've decided to go.
+ */
+export function calendarUrl(happening: Happening): string {
+  const stamp = (value: string) =>
+    new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const ends = happening.ends_at ?? new Date(new Date(happening.starts_at).getTime() + 3 * 3600e3).toISOString();
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: heading(happening).title,
+    dates: `${stamp(happening.starts_at)}/${stamp(ends)}`,
+    details: [happening.summary, happening.source_url].filter(Boolean).join("\n\n"),
+    location: happening.venue_name ?? "Addis Ababa",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
