@@ -52,4 +52,25 @@ describe("parseChannelPage", () => {
   test("no posts in unrelated html", () => {
     expect(parseChannelPage("<html><body>nothing</body></html>")).toEqual([]);
   });
+
+  // The poll command treats both of these as a hard error on page 1 rather than
+  // as an empty channel — they are what parser rot looks like from the outside,
+  // and a scheduled run that reports them as success loses same-day events
+  // silently. These lock in the two shapes the guard keys on.
+  describe("what parser rot looks like", () => {
+    test("markup we don't recognise yields no posts at all", () => {
+      const renamed = PAGE.replace(/tgme_widget_message\b/g, "tg_message_v2");
+      expect(parseChannelPage(renamed)).toEqual([]);
+    });
+
+    test("a stale text selector yields posts carrying no text", () => {
+      const renamed = PAGE.replace(/tgme_widget_message_text/g, "tg_text_v2");
+      const posts = parseChannelPage(renamed);
+      expect(posts).toHaveLength(2);
+      expect(posts.every((post) => post.text === "")).toBe(true);
+      // The id still parses, which is exactly why "we got posts" is not on its
+      // own evidence that the parser still works.
+      expect(posts[0]!.messageId).toBe(12873);
+    });
+  });
 });
