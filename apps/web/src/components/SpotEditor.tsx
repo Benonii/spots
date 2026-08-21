@@ -35,6 +35,7 @@ function blankDraft(): SpotDraft {
     name: "",
     description: "",
     mapUrl: "",
+    hideMap: false,
     tiktokUrl: "",
     lat: null,
     lng: null,
@@ -57,6 +58,7 @@ function draftFromSpot(s: Spot): SpotDraft {
     name: s.name,
     description: s.summary ?? "",
     mapUrl: s.map_url ?? "",
+    hideMap: s.hide_map ?? false,
     tiktokUrl: s.source_video_url ?? "",
     lat: s.lat,
     lng: s.lng,
@@ -83,6 +85,8 @@ type Props = {
   canDelete: boolean;
   canHide: boolean;
   canPurge: boolean;
+  /** Supers only: suppress the Maps button without clearing the link. */
+  canHideMap: boolean;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -90,7 +94,7 @@ type Props = {
 
 type Status = "idle" | "saving" | "error";
 
-export function SpotEditor({ mode, spot, userId, canDelete, canHide, canPurge, onClose, onSaved, onDeleted }: Props) {
+export function SpotEditor({ mode, spot, userId, canDelete, canHide, canPurge, canHideMap, onClose, onSaved, onDeleted }: Props) {
   const [draft, setDraft] = useState<SpotDraft>(() =>
     mode === "edit" && spot ? draftFromSpot(spot) : blankDraft(),
   );
@@ -320,6 +324,22 @@ export function SpotEditor({ mode, spot, userId, canDelete, canHide, canPurge, o
               inputMode="url"
             />
             <MapStatus state={mapState} />
+            {canHideMap && (
+              <label className="ed-check">
+                <input
+                  type="checkbox"
+                  checked={draft.hideMap}
+                  onChange={(e) => set("hideMap", e.target.checked)}
+                />
+                <span>
+                  Hide the Map button
+                  <i>
+                    The link stays saved — we match against it to spot
+                    duplicates — but visitors won't see a Map button.
+                  </i>
+                </span>
+              </label>
+            )}
           </Field>
 
           <Field

@@ -156,6 +156,11 @@ export const spots = pgTable(
     // Public reads filter these out; admins still see them to un-hide.
     hidden: boolean("hidden").notNull().default(false),
     mapUrl: text("map_url"), // pasted Google Maps link (manual spots' Maps button)
+    // Suppresses the Maps button in the app while keeping map_url intact — some
+    // scraped links point at the wrong place, but they're what we dedupe
+    // against, so the link stays and only the button goes. Super-admin only in
+    // practice: RLS already limits edits on scraped spots to supers.
+    hideMap: boolean("hide_map").notNull().default(false),
     // names of columns an admin has edited; the scrape upsert skips these so
     // human edits are never reverted. See apps/cli/src/commands/upsert.ts.
     lockedFields: text("locked_fields")

@@ -68,16 +68,18 @@ function NearItem({ spot, roadKm }: Ranked) {
         ~{formatRoadEstimate(roadKm)}
       </span>
       <span className="near-actions">
-        <a
-          className="action-btn"
-          href={mapsUrl(spot)}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Map of ${spot.name}`}
-        >
-          <PinIcon />
-          <span className="abtn-label">Map</span>
-        </a>
+        {!spot.hide_map && (
+          <a
+            className="action-btn"
+            href={mapsUrl(spot)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Map of ${spot.name}`}
+          >
+            <PinIcon />
+            <span className="abtn-label">Map</span>
+          </a>
+        )}
         {spot.source_video_url && (
           <a
             className="action-btn"
