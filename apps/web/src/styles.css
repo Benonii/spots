@@ -763,8 +763,6 @@ a.spot-cover:hover { filter: brightness(1.06); }
 /* The events deck has its own controls: the spots filter bar is gated to the
    spots deck, and none of its dimensions (area, price band, sort) mean anything
    for an event. Search + when + category chips, matching the spots layout. */
-.event-controls { margin-bottom: 4px; }
-
 @media (max-width: 900px) {
   /* The spots controls hide behind a "Search & filters" bar at this width and
      put the dice beside it. The events controls don't collapse — there are only
@@ -777,6 +775,10 @@ a.spot-cover:hover { filter: brightness(1.06); }
        the spots side these live inside the filter panel, which draws its own */
     background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 14px 16px;
+    /* the shared .controls rule zeroes this here — right for spots, where the
+       filter panel supplies the spacing, wrong for events, where the chips sit
+       directly underneath */
+    margin-bottom: 16px;
   }
   .event-controls .ctrl-search { grid-column: 1 / -1; }
   /* the 230px floor is what forced the wrap in the first place */
@@ -784,7 +786,6 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .event-controls .ctrl-spacer { display: none; }
   .event-controls .surprise { margin-left: 0; }
 }
-.event-chips { margin-bottom: 18px; }
 
 @media (max-width: 560px) {
   /* near list: Map/Watch become icon-only buttons in a row, and type shrinks a
