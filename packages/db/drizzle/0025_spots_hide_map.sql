@@ -18,9 +18,11 @@
 -- below a value some earlier run already applied is skipped for ever.
 --
 -- This entry was first dated 1787100000000, below 0024's real 1787301007578,
--- and was silently skipped on a clean run; it is now 1787400000000. Before
--- adding the next one, read the current high-water and beat it — reaching for a
--- round number is how both this migration and 0026 broke, an hour apart.
+-- and was silently skipped on a clean run. It was re-dated to 1787400000000,
+-- then to 1787600000000 when 0026 reached prod first and moved the high-water
+-- to 1787500000000 — the value has to beat prod, not merely the file next to
+-- it. Before adding the next one, read the current high-water and beat it;
+-- reaching for a round number is how both this migration and 0026 broke.
 --
 -- Deliberately not a locked_field: it's a curation flag about our own data
 -- quality, not one of the scrape-owned columns an upsert could revert.
