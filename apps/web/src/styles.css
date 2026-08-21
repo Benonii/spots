@@ -698,6 +698,79 @@ a.spot-cover:hover { filter: brightness(1.06); }
 }
 @keyframes near-spin { to { transform: rotate(360deg); } }
 
+/* ---------- "What's on" (events) page ----------
+   Shares the near-page shell (header, states, spinner) so the two secondary
+   pages read as siblings; only the row itself differs, because an event is a
+   poster + a time rather than a place + a distance. */
+.hap-days { display: flex; flex-direction: column; gap: 30px; }
+.hap-day { animation: hap-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--stagger, 0ms); }
+@keyframes hap-rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* The day is the spine of this page: sticky so it still answers "which day am
+   I looking at" halfway down a long Saturday. */
+.hap-daylabel {
+  position: sticky; top: 0; z-index: 2;
+  font-family: var(--serif-d); font-weight: 600; font-size: 0.9375rem;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+  margin: 0 0 12px; padding: 10px 0 8px;
+  background: linear-gradient(var(--bg) 72%, transparent);
+}
+
+.hap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hap-item {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 8px 15px; align-items: start;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 16px;
+  transition: border-color 0.16s ease;
+}
+.hap-item:hover { border-color: var(--line-soft); }
+
+/* Portrait, because event flyers are: the ratio alone distinguishes an event
+   from a spot's square thumbnail at a glance. Reserved before load — see Flyer. */
+.hap-flyer {
+  grid-row: span 2;
+  width: 62px; aspect-ratio: 3 / 4; flex: none; overflow: hidden;
+  border-radius: 10px; background-color: var(--line-soft);
+  background-size: cover; display: block; cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.hap-flyer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hap-flyer:hover { transform: scale(1.04); box-shadow: 0 2px 10px rgb(0 0 0 / 0.14); }
+.hap-flyer:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.hap-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.hap-title {
+  font-family: var(--serif-d); font-weight: 600; font-size: 1rem; line-height: 1.25;
+  color: var(--ink); text-decoration: none; text-wrap: pretty;
+  transition: color 0.15s ease;
+}
+.hap-title:hover { color: var(--accent-text); }
+.hap-meta { font-size: 0.8125rem; color: var(--muted); }
+.hap-summary {
+  margin: 5px 0 0; font-size: 0.8438rem; line-height: 1.5; color: var(--ink-soft);
+  text-wrap: pretty;
+  /* two lines is enough to say what it is; the flyer and the post carry the rest */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+
+.hap-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.hap-price {
+  white-space: nowrap; font-size: 0.8125rem; font-weight: 700; color: var(--accent-text);
+  background: var(--accent-wash); border-radius: 999px; padding: 4px 11px;
+}
+
+@media (max-width: 620px) {
+  /* Price and tickets drop under the text rather than fighting it for width,
+     staying aligned to the text column so the row keeps one left edge. */
+  .hap-item { grid-template-columns: auto 1fr; gap: 10px 12px; padding: 11px 12px; }
+  .hap-flyer { grid-row: span 1; width: 54px; }
+  .hap-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
+  .hap-title { font-size: 0.9375rem; }
+  .hap-meta { font-size: 0.75rem; }
+  .hap-summary { font-size: 0.8125rem; -webkit-line-clamp: 3; }
+  .hap-daylabel { font-size: 0.875rem; }
+  .hap-days { gap: 24px; }
+}
+
 @media (max-width: 560px) {
   /* near list: Map/Watch become icon-only buttons in a row, and type shrinks a
      step so names get room to breathe instead of truncating */

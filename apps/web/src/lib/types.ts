@@ -98,3 +98,28 @@ export const VISIT_DIMS = [
   ["portions", "Portions"],
   ["service", "Service"],
 ] as const;
+
+/**
+ * A published row of the `happenings` table — a time-bound event scraped from a
+ * Telegram events channel, as opposed to a `Spot`, which is a permanent venue.
+ *
+ * Only published rows ever reach the browser (RLS), and a published row always
+ * has a `starts_at` (DB check constraint), so the app never has to render an
+ * undated event. Everything else is genuinely optional: roughly a third of
+ * posts state no price and half name no ticket link.
+ */
+export type Happening = {
+  id: string;
+  source_url: string;
+  image_url: string | null;
+  title: string | null;
+  summary: string | null;
+  venue_name: string | null;
+  starts_at: string; // ISO; never null on a published row
+  ends_at: string | null;
+  price_min: number | null;
+  price_max: number | null;
+  price_currency: string;
+  ticket_url: string | null;
+  confidence: number | null;
+};

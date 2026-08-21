@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import type { QualitySignals, Spot } from "./types";
+import { startOfAddisToday } from "./happenings";
+import type { Happening, QualitySignals, Spot } from "./types";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -101,6 +102,42 @@ function mapSpots(rows: unknown[]): Spot[] {
       video_count: num(r.video_count),
       tags: r.tags ?? [],
       quality_signals: r.quality_signals ?? EMPTY_SIGNALS,
+    }),
+  );
+}
+
+/**
+ * Published events that haven't finished yet, soonest first.
+ *
+ * Expiry is a query predicate rather than a stored flag, so an event can never
+ * be shown after it's over even if nothing re-runs — that's the correctness
+ * property the whole feature rests on. Two cases: an event with a stated end is
+ * live until that end (a three-day festival stays up on day two); one without
+ * runs to the close of its own day in Addis.
+ *
+ * Columns are named rather than `select("*")` — a published row also carries
+ * review bookkeeping (who published it, why something was rejected) that the
+ * browser has no reason to receive.
+ */
+export async function fetchHappenings(): Promise<Happening[]> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("happenings")
+    .select(
+      "id, source_url, image_url, title, summary, venue_name, starts_at, ends_at, price_min, price_max, price_currency, ticket_url, confidence",
+    )
+    .or(
+      `ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${startOfAddisToday()})`,
+    )
+    .order("starts_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  // PostgREST serializes `numeric` as strings, same as the spots query.
+  return (data ?? []).map(
+    (row): Happening => ({
+      ...(row as Happening),
+      price_min: numOrNull((row as Happening).price_min),
+      price_max: numOrNull((row as Happening).price_max),
+      confidence: numOrNull((row as Happening).confidence),
     }),
   );
 }

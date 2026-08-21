@@ -82,6 +82,16 @@ function SearchIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
+    </svg>
+  );
+}
+
 function NearIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -846,6 +856,17 @@ export function App() {
               <span className="sk sk-count" aria-hidden="true" />
             )}
           </div>
+          <Tooltip label="What's on">
+            <Link
+              to="/happenings"
+              className="near-link"
+              aria-label="What's on"
+              onClick={() => void track("happenings_open")}
+            >
+              <CalendarIcon />
+              <span className="near-link-label">What's on</span>
+            </Link>
+          </Tooltip>
           <Tooltip label="Near me">
             <Link
               to="/near"
