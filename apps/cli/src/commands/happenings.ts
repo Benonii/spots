@@ -23,6 +23,12 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import pLimit from "p-limit";
 import type { NewHappening } from "@spots/db";
 import { db, schema } from "../db.ts";
+import { requireKeys } from "../env.ts";
+import {
+  ensureCoversBucket,
+  isRehosted,
+  rehostFlyer,
+} from "../lib/storage.ts";
 import { getModel } from "../lib/llm.ts";
 import {
   happeningExtractionSchema,
@@ -445,7 +451,110 @@ const publish = defineCommand({
   },
 });
 
+const flyers = defineCommand({
+  meta: {
+    name: "flyers",
+    description: "Re-host event flyers into Storage (Telegram's links expire in ~a day)",
+  },
+  args: {
+    channel: { type: "string", description: `Channel handle (default ${DEFAULT_CHANNEL})` },
+    pages: {
+      type: "string",
+      description: `Max pages to search for fresh links (default ${DEFAULT_MAX_PAGES})`,
+    },
+    force: { type: "boolean", description: "Re-host flyers already on Storage" },
+  },
+  async run({ args }) {
+    requireKeys("SUPABASE_URL", "SUPABASE_SECRET_KEY");
+    await ensureCoversBucket();
+
+    const channel = normalizeChannel(args.channel ?? DEFAULT_CHANNEL);
+    const maxPages = args.pages ? Number(args.pages) : DEFAULT_MAX_PAGES;
+    if (!Number.isInteger(maxPages) || maxPages <= 0) {
+      consola.error("--pages must be a positive integer");
+      process.exitCode = 1;
+      return;
+    }
+
+    // Rows still pointing at Telegram (or at nothing). A flyer already on
+    // Storage is permanent, so it never needs revisiting.
+    const rows = await db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        imageUrl: schema.happenings.imageUrl,
+      })
+      .from(schema.happenings)
+      .where(eq(schema.happenings.sourceChannel, channel))
+      .orderBy(sql`${schema.happenings.sourceMessageId} desc`);
+
+    const wanted = new Map(
+      rows
+        .filter((row) => args.force || !isRehosted(row.imageUrl))
+        .map((row) => [row.messageId, row]),
+    );
+    if (!wanted.size) {
+      consola.info("Every flyer is already on Storage.");
+      return;
+    }
+    consola.start(`Re-hosting ${wanted.size} flyers from t.me/s/${channel}…`);
+
+    // The stored links are mostly dead, so the channel page is re-read for
+    // fresh ones. Walking stops as soon as every wanted post has been seen —
+    // the ids are monotonic, so once we're past the oldest one there is nothing
+    // left to find.
+    const oldest = Math.min(...wanted.keys());
+    let before: number | undefined;
+    let hosted = 0;
+    let missed = 0;
+
+    for (let page = 0; page < maxPages && wanted.size; page++) {
+      let posts: TelegramPost[];
+      try {
+        posts = await fetchChannelPage(channel, before);
+      } catch (error) {
+        consola.error(
+          `Page fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        break;
+      }
+      if (!posts.length) break;
+
+      for (const post of posts) {
+        const row = wanted.get(post.messageId);
+        if (!row || !post.imageUrl) continue;
+        wanted.delete(post.messageId);
+        const url = await rehostFlyer(row.id, post.imageUrl);
+        if (!url) {
+          missed++;
+          consola.warn(`  ${post.messageId} flyer fetch failed`);
+          continue;
+        }
+        await db
+          .update(schema.happenings)
+          .set({ imageUrl: url, updatedAt: new Date() })
+          .where(eq(schema.happenings.id, row.id));
+        hosted++;
+        consola.log(`  ${post.messageId} ✓`);
+      }
+
+      const lowest = Math.min(...posts.map((post) => post.messageId));
+      if (lowest <= oldest) break;
+      before = lowest;
+      await sleep(jitter(2000, 5000));
+    }
+
+    // Posts whose flyer we never found: deleted from the channel, or older than
+    // the walk reached. They keep whatever URL they had.
+    const unseen = wanted.size;
+    consola.success(
+      `${hosted} flyers on Storage${missed ? `, ${missed} failed` : ""}${unseen ? `, ${unseen} not found on the channel` : ""}`,
+    );
+  },
+});
+
 export const happeningsCommand = defineCommand({
   meta: { name: "happenings", description: "Events scraped from Telegram" },
-  subCommands: { poll, extract, publish },
+  subCommands: { poll, extract, publish, flyers },
 });
