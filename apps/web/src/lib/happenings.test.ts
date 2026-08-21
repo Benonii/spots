@@ -16,6 +16,7 @@ import {
   startOfAddisToday,
   timeLabel,
 } from "./happenings";
+import { isFree, matchesKinds, matchesWhen } from "./happenings";
 
 const NOW = new Date("2026-08-21T09:00:00Z"); // 12:00 in Addis
 
@@ -32,6 +33,7 @@ const make = (over: Partial<Happening> = {}): Happening => ({
   price_max: null,
   price_currency: "ETB",
   ticket_url: null,
+  tags: ["music"],
   confidence: 0.9,
   ...over,
 });
@@ -218,5 +220,76 @@ describe("calendarUrl", () => {
   test("a stated end wins over the assumed three hours", () => {
     const url = new URL(calendarUrl(make({ ends_at: "2026-08-29T23:00:00+03:00" })));
     expect(url.searchParams.get("dates")).toBe("20260829T160000Z/20260829T200000Z");
+  });
+});
+
+describe("matchesWhen", () => {
+  // NOW is Friday 21 Aug 2026, 12:00 in Addis.
+  const at = (iso: string, over: Partial<Happening> = {}) => make({ starts_at: iso, ...over });
+
+  test("anything already over is out of every window", () => {
+    const gone = at("2026-08-19T19:00:00+03:00");
+    for (const when of ["upcoming", "today", "weekend", "month"] as const) {
+      expect(matchesWhen(gone, when, NOW)).toBe(false);
+    }
+  });
+
+  // The multi-day case the server predicate also has to handle: day two of a
+  // festival is still on, even though it started before today.
+  test("a running multi-day event stays in", () => {
+    const festival = at("2026-08-20T10:00:00+03:00", { ends_at: "2026-08-23T22:00:00+03:00" });
+    expect(matchesWhen(festival, "upcoming", NOW)).toBe(true);
+    expect(matchesWhen(festival, "weekend", NOW)).toBe(true);
+  });
+
+  test("today means today in Addis", () => {
+    expect(matchesWhen(at("2026-08-21T21:00:00+03:00"), "today", NOW)).toBe(true);
+    expect(matchesWhen(at("2026-08-22T09:00:00+03:00"), "today", NOW)).toBe(false);
+  });
+
+  test("the weekend is Friday through Sunday", () => {
+    expect(matchesWhen(at("2026-08-21T21:00:00+03:00"), "weekend", NOW)).toBe(true); // Fri
+    expect(matchesWhen(at("2026-08-23T18:00:00+03:00"), "weekend", NOW)).toBe(true); // Sun
+    expect(matchesWhen(at("2026-08-25T18:00:00+03:00"), "weekend", NOW)).toBe(false); // Tue
+    expect(matchesWhen(at("2026-08-29T18:00:00+03:00"), "weekend", NOW)).toBe(false); // next Sat
+  });
+
+  // On a Sunday the weekend that matters is the one ending, not the one five
+  // days out — otherwise the filter goes empty exactly when people are using it.
+  test("on Sunday the weekend is the current one", () => {
+    const sunday = new Date("2026-08-23T09:00:00Z");
+    expect(matchesWhen(at("2026-08-23T18:00:00+03:00"), "weekend", sunday)).toBe(true);
+  });
+
+  test("within a month excludes the far future", () => {
+    expect(matchesWhen(at("2026-09-14T18:00:00+03:00"), "month", NOW)).toBe(true);
+    expect(matchesWhen(at("2026-11-01T18:00:00+03:00"), "month", NOW)).toBe(false);
+  });
+});
+
+describe("matchesKinds", () => {
+  test("no chips selected matches everything", () => {
+    expect(matchesKinds(make({ tags: [] }), new Set())).toBe(true);
+  });
+
+  // "Art & film" is one chip over two tags, because that's one question.
+  test("a grouped chip covers both its tags", () => {
+    expect(matchesKinds(make({ tags: ["film"] }), new Set(["art"]))).toBe(true);
+    expect(matchesKinds(make({ tags: ["art"] }), new Set(["art"]))).toBe(true);
+  });
+
+  test("chips widen rather than narrow", () => {
+    const gig = make({ tags: ["music"] });
+    expect(matchesKinds(gig, new Set(["food"]))).toBe(false);
+    expect(matchesKinds(gig, new Set(["food", "music"]))).toBe(true);
+  });
+});
+
+describe("isFree", () => {
+  test("only an explicit zero is free", () => {
+    expect(isFree(make({ price_min: 0 }))).toBe(true);
+    expect(isFree(make({ price_min: 700 }))).toBe(false);
+    // 72% of posts state no price — unknown must never read as free.
+    expect(isFree(make({ price_min: null }))).toBe(false);
   });
 });

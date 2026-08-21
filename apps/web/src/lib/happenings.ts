@@ -175,6 +175,8 @@ export function flyerGradient(id: string): string {
 export function countdown(iso: string, now = new Date()): string {
   const day = (value: string) => Date.parse(`${addisDayKey(value)}T00:00:00Z`);
   const days = Math.round((day(iso) - day(now.toISOString())) / 864e5);
+  // Only a multi-day event that's still running can be in the past here: the
+  // app never shows one that's finished, and extraction rejects them outright.
   if (days < 0) return "On now";
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
@@ -221,4 +223,103 @@ export function calendarUrl(happening: Happening): string {
     location: happening.venue_name ?? "Addis Ababa",
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* filters                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The category chips, and which extracted tags each one covers.
+ *
+ * Grouped rather than one-chip-per-tag: art and film are separate tags because
+ * that's a real distinction in the data, but as filters they're one question a
+ * reader asks. Six chips against a typical 30-50 upcoming events — enough that
+ * each one has something behind it.
+ */
+export const EVENT_KINDS: { key: string; label: string; tags: string[] }[] = [
+  { key: "music", label: "Music", tags: ["music"] },
+  { key: "art", label: "Art & film", tags: ["art", "film"] },
+  { key: "food", label: "Food", tags: ["food"] },
+  { key: "market", label: "Markets", tags: ["market"] },
+  { key: "outdoors", label: "Outdoors", tags: ["outdoors"] },
+  { key: "talk", label: "Talks", tags: ["talk"] },
+];
+
+/**
+ * Time windows. Measured over 93 days of the channel: 69% of events naming a
+ * weekday fall Friday–Sunday, and the median announcement lead time is three
+ * days. So "this weekend" is the question people actually have, and anything
+ * longer than a month is beyond what the channel announces.
+ */
+export type EventWhen = "upcoming" | "today" | "weekend" | "month";
+
+export const EVENT_WHEN_OPTIONS: { value: EventWhen; label: string }[] = [
+  { value: "upcoming", label: "Anytime" },
+  { value: "today", label: "Today" },
+  { value: "weekend", label: "This weekend" },
+  { value: "month", label: "Within a month" },
+];
+
+/** Friday 00:00 → Sunday 23:59 of the current (or coming) weekend, in Addis. */
+function weekendWindow(now: Date): { from: number; to: number } {
+  const local = new Date(now.getTime() + ADDIS_OFFSET_MS);
+  const weekday = local.getUTCDay(); // 0 Sun … 6 Sat
+  // Sunday counts as the weekend that's ending, not the one six days away.
+  const toFriday = weekday === 0 ? -2 : 5 - weekday;
+  const friday = new Date(local);
+  friday.setUTCDate(local.getUTCDate() + toFriday);
+  friday.setUTCHours(0, 0, 0, 0);
+  const sunday = new Date(friday);
+  sunday.setUTCDate(friday.getUTCDate() + 2);
+  sunday.setUTCHours(23, 59, 59, 999);
+  return {
+    from: friday.getTime() - ADDIS_OFFSET_MS,
+    to: sunday.getTime() - ADDIS_OFFSET_MS,
+  };
+}
+
+/**
+ * When an event stops being worth showing. Mirrors the CLI's rule exactly (see
+ * apps/cli/src/happenings-extraction.ts): a stated end wins, otherwise it runs
+ * to the close of its own day — so a festival on day two doesn't vanish.
+ */
+function expiryOf(happening: Happening): number {
+  if (happening.ends_at) return Date.parse(happening.ends_at);
+  const local = new Date(Date.parse(happening.starts_at) + ADDIS_OFFSET_MS);
+  local.setUTCHours(23, 59, 59, 999);
+  return local.getTime() - ADDIS_OFFSET_MS;
+}
+
+export function matchesWhen(
+  happening: Happening,
+  when: EventWhen,
+  now = new Date(),
+): boolean {
+  // Everything is upcoming-or-running first; the windows narrow from there.
+  if (expiryOf(happening) < now.getTime()) return false;
+  const starts = Date.parse(happening.starts_at);
+  if (when === "today") return addisDayKey(happening.starts_at) === addisDayKey(now.toISOString());
+  if (when === "weekend") {
+    const { from, to } = weekendWindow(now);
+    return starts <= to && expiryOf(happening) >= from;
+  }
+  if (when === "month") return starts <= now.getTime() + 30 * 864e5;
+  return true;
+}
+
+export function matchesKinds(happening: Happening, kinds: Set<string>): boolean {
+  if (!kinds.size) return true;
+  return EVENT_KINDS.filter((kind) => kinds.has(kind.key)).some((kind) =>
+    kind.tags.some((tag) => happening.tags.includes(tag)),
+  );
+}
+
+/**
+ * Free means the post said so. Only 28% of posts state a price at all, which is
+ * why there are no price bands here — a band filter would hide three quarters
+ * of the catalog on missing data rather than on anything the reader chose.
+ */
+export function isFree(happening: Happening): boolean {
+  return happening.price_min === 0;
 }

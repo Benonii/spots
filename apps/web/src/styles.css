@@ -757,6 +757,12 @@ a.spot-cover:hover { filter: brightness(1.06); }
   font-variant-numeric: tabular-nums;
 }
 
+/* The events deck has its own controls: the spots filter bar is gated to the
+   spots deck, and none of its dimensions (area, price band, sort) mean anything
+   for an event. Search + when + category chips, matching the spots layout. */
+.event-controls { margin-bottom: 4px; }
+.event-chips { margin-bottom: 18px; }
+
 @media (max-width: 560px) {
   /* near list: Map/Watch become icon-only buttons in a row, and type shrinks a
      step so names get room to breathe instead of truncating */

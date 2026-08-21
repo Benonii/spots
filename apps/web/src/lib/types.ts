@@ -121,5 +121,6 @@ export type Happening = {
   price_max: number | null;
   price_currency: string;
   ticket_url: string | null;
+  tags: string[];
   confidence: number | null;
 };

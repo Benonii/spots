@@ -9,7 +9,15 @@ import {
   fetchSpots,
 } from "./lib/supabase";
 import { signInWithGoogle, signOut, supabase } from "./lib/supabase";
-import { dedupe } from "./lib/happenings";
+import {
+  dedupe,
+  EVENT_KINDS,
+  EVENT_WHEN_OPTIONS,
+  isFree,
+  matchesKinds,
+  matchesWhen,
+  type EventWhen,
+} from "./lib/happenings";
 import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
@@ -187,6 +195,10 @@ export function App() {
   const [deck, setDeck] = useState<"spots" | "events">("spots");
   const [happenings, setHappenings] = useState<Happening[] | null>(null);
   const [eventIndex, setEventIndex] = useState(0);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventWhen, setEventWhen] = useState<EventWhen>("upcoming");
+  const [eventKinds, setEventKinds] = useState<Set<string>>(new Set());
+  const [eventFreeOnly, setEventFreeOnly] = useState(false);
   const [index, setIndex] = useState(0);
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
@@ -486,7 +498,7 @@ export function App() {
   // is dead weight for the (majority) of visits that never type a query.
   const [FuseCtor, setFuseCtor] = useState<typeof Fuse | null>(null);
   useEffect(() => {
-    if (!query.trim() || FuseCtor) return;
+    if ((!query.trim() && !eventQuery.trim()) || FuseCtor) return;
     let live = true;
     void import("fuse.js").then(
       (m) => live && setFuseCtor(() => m.default),
@@ -495,7 +507,7 @@ export function App() {
     return () => {
       live = false;
     };
-  }, [query, FuseCtor]);
+  }, [query, eventQuery, FuseCtor]);
 
   const fuse = useMemo(
     () =>
@@ -777,7 +789,72 @@ export function App() {
       .catch(() => setHappenings([]));
   }, [deck, happenings]);
 
-  const events = useMemo(() => (happenings ? dedupe(happenings) : []), [happenings]);
+  // Same Fuse instance policy as spots: loaded on the first keystroke, with a
+  // substring fallback so search still works if the chunk never arrives.
+  const eventFuse = useMemo(
+    () =>
+      FuseCtor && happenings
+        ? new FuseCtor(dedupe(happenings), {
+            keys: [
+              { name: "title", weight: 3 },
+              { name: "venue_name", weight: 2 },
+              { name: "tags", weight: 1 },
+              { name: "summary", weight: 0.5 },
+            ],
+            threshold: 0.4,
+            ignoreLocation: true,
+          })
+        : null,
+    [FuseCtor, happenings],
+  );
+
+  const events = useMemo(() => {
+    if (!happenings) return [];
+    const now = new Date();
+    let list = dedupe(happenings).filter(
+      (h) =>
+        matchesWhen(h, eventWhen, now) &&
+        matchesKinds(h, eventKinds) &&
+        (!eventFreeOnly || isFree(h)),
+    );
+    const q = eventQuery.trim();
+    if (q) {
+      const hits = eventFuse
+        ? new Set(eventFuse.search(q).map((r) => r.item.id))
+        : null;
+      const needle = q.toLowerCase();
+      list = list.filter((h) =>
+        hits
+          ? hits.has(h.id)
+          : `${h.title ?? ""} ${h.venue_name ?? ""} ${h.summary ?? ""}`
+              .toLowerCase()
+              .includes(needle),
+      );
+    }
+    return list;
+  }, [happenings, eventWhen, eventKinds, eventFreeOnly, eventQuery, eventFuse]);
+
+  // Any filter change re-aims the deck at the first match rather than leaving
+  // it parked on an index that now points at something else.
+  useEffect(() => {
+    setEventIndex(0);
+  }, [eventWhen, eventKinds, eventFreeOnly, eventQuery]);
+
+  const toggleEventKind = (key: string) =>
+    setEventKinds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  const clearEventFilters = () => {
+    setEventQuery("");
+    setEventWhen("upcoming");
+    setEventKinds(new Set());
+    setEventFreeOnly(false);
+  };
+  const eventFiltersOn =
+    eventQuery.trim() !== "" || eventWhen !== "upcoming" || eventKinds.size > 0 || eventFreeOnly;
   const currentEvent = events[Math.min(eventIndex, Math.max(events.length - 1, 0))];
 
   const goEvent = (delta: number) => {
@@ -1029,6 +1106,53 @@ export function App() {
       </section>
       )}
 
+      {deck === "events" && (
+        <>
+          <section className="controls event-controls">
+            <div className="ctrl ctrl-search">
+              <label htmlFor="event-search">Search</label>
+              <input
+                id="event-search"
+                className="search-input"
+                type="text"
+                placeholder="afro house, rooftop, Anki Liquor…"
+                value={eventQuery}
+                onChange={(e) => setEventQuery(e.target.value)}
+              />
+            </div>
+            <div className="ctrl">
+              <label>When</label>
+              <Dropdown
+                value={eventWhen}
+                onChange={(v) => setEventWhen(v as EventWhen)}
+                options={EVENT_WHEN_OPTIONS}
+                ariaLabel="When"
+              />
+            </div>
+          </section>
+
+          <section className="cat-chips event-chips">
+            {EVENT_KINDS.map((kind) => (
+              <button
+                key={kind.key}
+                className={"cat-chip" + (eventKinds.has(kind.key) ? " on" : "")}
+                onClick={() => toggleEventKind(kind.key)}
+              >
+                {kind.label}
+              </button>
+            ))}
+            {/* Free is a chip rather than a price dropdown: only 28% of posts
+                state a price at all, so bands would filter on missing data. */}
+            <button
+              className={"cat-chip" + (eventFreeOnly ? " on" : "")}
+              onClick={() => setEventFreeOnly((v) => !v)}
+            >
+              Free
+            </button>
+          </section>
+        </>
+      )}
+
       {deck === "events" ? (
         !happenings ? (
           <div className="spot-stage">
@@ -1048,8 +1172,17 @@ export function App() {
           </div>
         ) : (
           <div className="noresults">
-            Nothing on the calendar yet. We list events as the city announces
-            them — most land only a few days ahead.
+            {eventFiltersOn ? (
+              <>
+                No events match these filters.{" "}
+                <button onClick={clearEventFilters}>Clear filters</button>
+              </>
+            ) : (
+              <>
+                Nothing on the calendar yet. We list events as the city
+                announces them — most land only a few days ahead.
+              </>
+            )}
           </div>
         )
       ) : !spots ? (

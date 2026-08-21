@@ -124,7 +124,7 @@ export async function fetchHappenings(): Promise<Happening[]> {
   const { data, error } = await supabase
     .from("happenings")
     .select(
-      "id, source_url, image_url, title, summary, venue_name, starts_at, ends_at, price_min, price_max, price_currency, ticket_url, confidence",
+      "id, source_url, image_url, title, summary, venue_name, starts_at, ends_at, price_min, price_max, price_currency, ticket_url, tags, confidence",
     )
     .or(
       `ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${startOfAddisToday()})`,
@@ -138,6 +138,7 @@ export async function fetchHappenings(): Promise<Happening[]> {
       price_min: numOrNull((row as Happening).price_min),
       price_max: numOrNull((row as Happening).price_max),
       confidence: numOrNull((row as Happening).confidence),
+      tags: (row as Happening).tags ?? [],
     }),
   );
 }
