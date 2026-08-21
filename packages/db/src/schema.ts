@@ -851,14 +851,20 @@ export const happenings = pgTable(
       using: sql`is_admin()`,
     }),
     // The scheduled poller runs in CI under a least-privilege login rather than
-    // the RLS-bypassing CLI connection, so it needs a policy of its own. Its
-    // GRANTs cover this table only — see drizzle/0023_poller_role.sql, which
-    // also creates the role (passwordless; the password is set out of band).
-    pgPolicy("poller manages happenings", {
-      for: "all",
+    // the RLS-bypassing CLI connection, so it needs policies of its own —
+    // scoped to exactly what the poll command does: read the dedup key, insert
+    // pending rows. A leaked POLLER_DATABASE_URL therefore can't touch
+    // published content. See drizzle/0023_poller_role.sql (creates the role;
+    // password set out of band) and 0024_tighten_poller.sql (this shape).
+    pgPolicy("poller reads happenings", {
+      for: "select",
       to: "spots_poller",
       using: sql`true`,
-      withCheck: sql`true`,
+    }),
+    pgPolicy("poller inserts pending happenings", {
+      for: "insert",
+      to: "spots_poller",
+      withCheck: sql`${t.status} = 'pending'`,
     }),
   ],
 );
