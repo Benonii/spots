@@ -1,3 +1,10 @@
+-- NOTE for the next hand-written migration: drizzle-kit applies only entries
+-- whose journal `when` is later than the last one already applied. It does not
+-- look at `idx`, does not mind gaps, and does not error on a stale timestamp —
+-- it just silently does nothing. This file was first written with a round-number
+-- `when` that predated 0024 and was skipped by a clean `db:migrate` run.
+-- Always pick a `when` greater than every entry already in the journal.
+--
 -- Categories for events, so the app can filter them the way it filters spots.
 --
 -- A fixed vocabulary, not free text: filter chips have to be a closed set or
