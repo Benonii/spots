@@ -191,12 +191,31 @@ export function areaOptions(neighborhoods: (string | null | undefined)[]): strin
 }
 
 /**
- * Everything a search box should match for a canonical area: the label itself
- * plus every known variant, so typing "piazza" finds Piassa and "arat kilo"
- * finds 4 Kilo.
+ * Everything a search box should match for a canonical area: the label plus the
+ * variants that are genuine synonyms, so typing "piazza" finds Piassa and
+ * "arat kilo" finds 4 Kilo.
+ *
+ * Variants that name a *different* area are dropped. Some entries exist only to
+ * route an odd string ("Bole; Summit" → Bole, "Bole (Summit area)" → Summit);
+ * left in, they make "bole" match Summit and "summit" match Bole, which is how
+ * a filter loses your trust. A variant may still name this area's own parent —
+ * "Bole Bulbula" keeps its "Bole" — since that match is the one you meant.
  */
+const SEARCH_TEXT: Record<string, string> = Object.fromEntries(
+  Object.entries(AREA_FAMILIES).map(([canonical, variants]) => {
+    const foreign = Object.keys(AREA_FAMILIES).filter(
+      (other) => other !== canonical && !norm(canonical).startsWith(`${norm(other)} `),
+    );
+    const mentionsAnother = (variant: string) => {
+      const words = ` ${norm(variant)} `;
+      return foreign.some((other) => words.includes(` ${norm(other)} `));
+    };
+    return [canonical, [canonical, ...variants.filter((v) => !mentionsAnother(v))].join(" ").toLowerCase()];
+  }),
+);
+
 export function areaSearchText(canonical: string): string {
-  return [canonical, ...(AREA_FAMILIES[canonical] ?? [])].join(" ").toLowerCase();
+  return SEARCH_TEXT[canonical] ?? canonical.toLowerCase();
 }
 
 /**

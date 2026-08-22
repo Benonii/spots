@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { areaOptions, areaSearchText, areaTier, canonicalArea } from "./areas";
+import { AREA_FAMILIES, areaOptions, areaSearchText, areaTier, canonicalArea } from "./areas";
 
 describe("canonicalArea", () => {
   test("folds spelling drift onto one label", () => {
@@ -80,5 +80,31 @@ describe("areaTier", () => {
     expect(areaTier("Gerji", "Bole")).toBeNull();
     expect(areaTier("Bole Bulbula", "Bole")).toBeNull(); // its own area now, not a child
     expect(areaTier(null, "Bole")).toBeNull();
+  });
+});
+
+describe("areaSearchText leaks nothing across areas", () => {
+  test("a routing-only variant naming another area is dropped", () => {
+    // "Bole; Summit" routes to Bole, "Bole (Summit area)" routes to Summit —
+    // neither is a synonym, and either one left in cross-matches the other.
+    expect(areaSearchText("Bole")).not.toContain("summit");
+    expect(areaSearchText("Summit")).not.toContain("bole");
+    expect(areaSearchText("Wello Sefer")).not.toContain("bole");
+    expect(areaSearchText("4 Kilo")).not.toContain("arada");
+  });
+
+  test("a variant naming this area's own parent survives", () => {
+    expect(areaSearchText("Bole Bulbula")).toContain("bulbula");
+    expect(areaSearchText("Bole Rwanda")).toContain("riwonda");
+  });
+
+  test("no area's search text matches an unrelated area's label", () => {
+    for (const area of areaOptions(Object.keys(AREA_FAMILIES)).slice(1)) {
+      const hay = ` ${areaSearchText(area)} `;
+      for (const other of Object.keys(AREA_FAMILIES)) {
+        if (other === area || area.toLowerCase().startsWith(`${other.toLowerCase()} `)) continue;
+        expect(hay).not.toContain(` ${other.toLowerCase()} `);
+      }
+    }
   });
 });
