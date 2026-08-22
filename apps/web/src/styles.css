@@ -769,15 +769,15 @@ a.spot-cover:hover { filter: brightness(1.06); }
      two of them — so they stay visible and the dice pairs with the When
      dropdown instead of being stranded on a line of its own.
      Two rows: search across the top, When and the dice sharing the second. */
-  .event-controls {
+  /* Both classes on purpose. The shared `.controls` override further down this
+     stylesheet strips the card and zeroes the margin at this width — correct for
+     spots, where these sit inside the filter panel that draws its own frame, and
+     wrong for events, which have no panel. Matching `.controls`' specificity
+     would lose on source order, so this has to be more specific. */
+  .controls.event-controls {
     display: grid; grid-template-columns: 1fr auto; gap: 14px 12px; align-items: end;
-    /* re-assert the card: the shared .controls rule strips it here, because on
-       the spots side these live inside the filter panel, which draws its own */
     background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 14px 16px;
-    /* the shared .controls rule zeroes this here — right for spots, where the
-       filter panel supplies the spacing, wrong for events, where the chips sit
-       directly underneath */
     margin-bottom: 16px;
   }
   .event-controls .ctrl-search { grid-column: 1 / -1; }
