@@ -11,10 +11,11 @@
 --   Block B — Ethiopic strings transliterated, and two unreadable strings
 --             rewritten. Skip this block if you'd rather keep the originals.
 --
--- Run inside the transaction; the final SELECT prints the resulting area list
--- so you can eyeball it before COMMIT.
-
-BEGIN;
+-- Run it with:
+--
+--   bun run spots sql docs/sql/2026-08-22-normalize-areas.sql
+--
+-- which rolls back and prints the resulting area list. Add --commit to keep it.
 
 -- ---------------------------------------------------------------- Block A
 UPDATE spots SET neighborhood = CASE neighborhood
@@ -106,5 +107,3 @@ WHERE neighborhood IS NOT NULL;
 SELECT neighborhood, count(*) AS n
 FROM spots WHERE neighborhood IS NOT NULL
 GROUP BY neighborhood ORDER BY neighborhood;
-
--- COMMIT;   -- ← uncomment once the list above looks right, or ROLLBACK;
