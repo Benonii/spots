@@ -317,6 +317,29 @@ body {
 .dd-opt:hover { background: var(--press); color: var(--ink); }
 .dd-opt.sel { color: var(--primary); font-weight: 600; background: var(--press); }
 .dd-check { color: var(--accent-text); font-size: 0.7812rem; flex: none; }
+
+/* dropdown that filters as you type — the area list is too long to scroll */
+.dd-search-menu { display: flex; flex-direction: column; max-height: 340px; overflow: hidden; padding: 0; }
+.dd-search {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 10px 12px; border-bottom: 1px solid var(--line);
+}
+.dd-search-icon { color: var(--muted); flex: none; }
+.dd-search-input {
+  flex: 1; min-width: 0; border: none; background: transparent; padding: 0;
+  font-family: var(--serif-b); color: var(--ink);
+  /* 16px exactly: anything smaller and iOS Safari zooms the page on focus */
+  font-size: 1rem;
+}
+.dd-search-input::placeholder { color: var(--muted); font-style: italic; }
+.dd-search-input:focus { outline: none; }
+.dd-search-list { overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
+/* keyboard cursor — distinct from `.sel`, which marks the current filter */
+.dd-opt.active { background: var(--press); color: var(--ink); }
+.dd-empty {
+  margin: 0; padding: 14px 11px; text-align: center;
+  font-family: var(--serif-b); font-size: 0.8438rem; color: var(--muted);
+}
 .ctrl-spacer { flex: 1 1 auto; }
 .surprise {
   font-family: var(--serif-d); font-weight: 500; font-size: 0.9062rem; letter-spacing: 0.2px;
