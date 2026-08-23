@@ -1,59 +1,110 @@
 import { describe, expect, test } from "bun:test";
-import { areaTier, baseArea } from "./areas";
+import { AREA_FAMILIES, areaOptions, areaSearchText, areaTier, canonicalArea } from "./areas";
 
-describe("baseArea", () => {
-  test("strips parenthetical qualifiers and case", () => {
-    expect(baseArea("4 Kilo (Abrehot)")).toBe("4 kilo");
-    expect(baseArea("Bole (Rwanda)")).toBe("bole");
-    expect(baseArea("4 kilo")).toBe("4 kilo");
+describe("canonicalArea", () => {
+  test("folds spelling drift onto one label", () => {
+    expect(canonicalArea("Piazza")).toBe("Piassa");
+    expect(canonicalArea("Arat Kilo")).toBe("4 Kilo");
+    expect(canonicalArea("Aratkilo")).toBe("4 Kilo");
+    expect(canonicalArea("4kilo")).toBe("4 Kilo");
+    expect(canonicalArea("Mergenagna")).toBe("Megenagna");
+    expect(canonicalArea("Merakto")).toBe("Merkato");
+    expect(canonicalArea("Bole Micheal")).toBe("Bole");
   });
 
-  test("folds aliases", () => {
-    expect(baseArea("Arat Kilo")).toBe("4 kilo");
-    expect(baseArea("Aratkilo")).toBe("4 kilo");
-    expect(baseArea("Piazza")).toBe("piassa");
-    expect(baseArea("Wollo Sefer")).toBe("wello sefer");
-    expect(baseArea("5kilo")).toBe("5 kilo");
+  test("Semit and Summit are the same area", () => {
+    expect(canonicalArea("Semit Safari (in front of Agora)")).toBe("Summit");
+    expect(canonicalArea("Sumit File Bet (behind Ontime restaurant)")).toBe("Summit");
+    expect(canonicalArea("Summit 72")).toBe("Summit");
   });
 
-  test("null/empty in, null out", () => {
-    expect(baseArea(null)).toBeNull();
-    expect(baseArea("")).toBeNull();
+  test("Arada stays its own area, but a spot naming 4 Kilo files there", () => {
+    expect(canonicalArea("Arada")).toBe("Arada");
+    expect(canonicalArea("Arada (Arat Kilo)")).toBe("4 Kilo");
+  });
+
+  test("a qualifier that names a more specific area wins over the stem", () => {
+    expect(canonicalArea("Bole (Bulbula & Gazebo Square)")).toBe("Bole Bulbula");
+    expect(canonicalArea("Bole (Rewanda)")).toBe("Bole Rwanda");
+    expect(canonicalArea("Bole Welo Sefer")).toBe("Wello Sefer");
+    // …and a qualifier that's just a landmark falls back to the stem.
+    expect(canonicalArea("Bole (Hadere Mall)")).toBe("Bole");
+  });
+
+  test("Ethiopic strings resolve — lowercasing can't help them", () => {
+    expect(canonicalArea("ጀሞ ሚካኤል")).toBe("Jemo");
+    expect(canonicalArea("ሰሚት ሰላሳ ሜትር")).toBe("Summit");
+    expect(canonicalArea("መካኒሳ አቦ ማዞሪያ አቦ ጋርደን")).toBe("Mekanisa");
+  });
+
+  test("a multi-branch string files under the first area listed", () => {
+    expect(canonicalArea("Bole; Summit")).toBe("Bole");
+    expect(canonicalArea("Bole; Meskel Adebabay; 5 Kilo (multiple branches)")).toBe("Bole");
+  });
+
+  test("an unseen area is kept, not dropped", () => {
+    expect(canonicalArea("Somewhere New")).toBe("Somewhere New");
+    expect(canonicalArea("Summit 40 meter")).toBe("Summit"); // …unless the stem is known
+    expect(canonicalArea(null)).toBeNull();
+    expect(canonicalArea("  ")).toBeNull();
+  });
+});
+
+describe("areaOptions", () => {
+  test("dedupes to canonical labels, alphabetical, All areas first", () => {
+    expect(areaOptions(["Piazza", "Piassa", "Gerji", null, "Arat Kilo"])).toEqual([
+      "All areas",
+      "4 Kilo",
+      "Gerji",
+      "Piassa",
+    ]);
+  });
+});
+
+describe("areaSearchText", () => {
+  test("carries the variants so a search box matches them", () => {
+    expect(areaSearchText("Piassa")).toContain("piazza");
+    expect(areaSearchText("4 Kilo")).toContain("arat kilo");
+    expect(areaSearchText("Summit")).toContain("semit");
   });
 });
 
 describe("areaTier", () => {
-  test("exact filter match ranks first", () => {
-    expect(areaTier("4 Kilo (Abrehot)", "4 Kilo (Abrehot)")).toBe(0);
+  test("naming the area outright ranks above naming a qualified form", () => {
+    expect(areaTier("Bole", "Bole")).toBe(0);
+    expect(areaTier("Bole (Hadere Mall)", "Bole")).toBe(1);
+    expect(areaTier("Semit", "Summit")).toBe(1); // a variant spelling is still a match
   });
 
-  test("bare base area ranks second", () => {
-    expect(areaTier("4 Kilo", "4 Kilo (Abrehot)")).toBe(1);
-    expect(areaTier("4 kilo", "4 Kilo (Abrehot)")).toBe(1);
-    expect(areaTier("Arat Kilo", "4 Kilo (Abrehot)")).toBe(1);
+  test("another area is excluded", () => {
+    expect(areaTier("Gerji", "Bole")).toBeNull();
+    expect(areaTier("Bole Bulbula", "Bole")).toBeNull(); // its own area now, not a child
+    expect(areaTier(null, "Bole")).toBeNull();
+  });
+});
+
+describe("areaSearchText leaks nothing across areas", () => {
+  test("a routing-only variant naming another area is dropped", () => {
+    // "Bole; Summit" routes to Bole, "Bole (Summit area)" routes to Summit —
+    // neither is a synonym, and either one left in cross-matches the other.
+    expect(areaSearchText("Bole")).not.toContain("summit");
+    expect(areaSearchText("Summit")).not.toContain("bole");
+    expect(areaSearchText("Wello Sefer")).not.toContain("bole");
+    expect(areaSearchText("4 Kilo")).not.toContain("arada");
   });
 
-  test("other qualified variants rank third", () => {
-    expect(areaTier("4 Kilo (Ambassador Gerba)", "4 Kilo (Abrehot)")).toBe(2);
-    expect(areaTier("4 Kilo (Ambassador Gerba)", "4 Kilo")).toBe(2);
-    expect(areaTier("Bole Atlas", "Bole")).toBe(2);
-    expect(areaTier("Bole (Medhanealem)", "Bole")).toBe(2);
+  test("a variant naming this area's own parent survives", () => {
+    expect(areaSearchText("Bole Bulbula")).toContain("bulbula");
+    expect(areaSearchText("Bole Rwanda")).toContain("riwonda");
   });
 
-  test("selecting a bare filter still ranks it 0", () => {
-    expect(areaTier("4 Kilo", "4 Kilo")).toBe(0);
-    expect(areaTier("Arat Kilo", "Arat Kilo")).toBe(0);
-  });
-
-  test("unrelated areas are excluded", () => {
-    expect(areaTier("Gerji", "4 Kilo")).toBeNull();
-    expect(areaTier("Atlas", "Bole Atlas")).toBeNull(); // parent doesn't match child filter
-    expect(areaTier(null, "4 Kilo")).toBeNull();
-  });
-
-  test("qualified selection does not leak into siblings", () => {
-    // "Bole Atlas" selected must not match plain "Bole" spots upward…
-    expect(areaTier("Bole", "Bole Atlas")).toBeNull();
-    // …but "Bole" selected pulls "Bole Atlas" down as tier 2 (covered above).
+  test("no area's search text matches an unrelated area's label", () => {
+    for (const area of areaOptions(Object.keys(AREA_FAMILIES)).slice(1)) {
+      const hay = ` ${areaSearchText(area)} `;
+      for (const other of Object.keys(AREA_FAMILIES)) {
+        if (other === area || area.toLowerCase().startsWith(`${other.toLowerCase()} `)) continue;
+        expect(hay).not.toContain(` ${other.toLowerCase()} `);
+      }
+    }
   });
 });

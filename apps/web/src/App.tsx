@@ -24,11 +24,12 @@ import {
   type Match,
   type OptIn,
 } from "./lib/dating";
-import { areaTier } from "./lib/areas";
+import { ALL_AREAS, areaOptions, areaSearchText, areaTier } from "./lib/areas";
 import { CATEGORIES, isNewSpot, matchesCategories } from "./lib/categories";
 import { PRICE_LABELS } from "./lib/format";
 import { track, trackAppOpen } from "./lib/analytics";
 import { Dropdown, type Option } from "./components/Dropdown";
+import { SearchableDropdown } from "./components/SearchableDropdown";
 import { DiceButton } from "./components/DiceButton";
 import { SpotCard } from "./components/SpotCard";
 import { VisitedTable } from "./components/VisitedTable";
@@ -159,7 +160,7 @@ export function App() {
 
   const [query, setQuery] = useState("");
   const [categories, setCategories] = useState<Set<string>>(new Set());
-  const [area, setArea] = useState("All areas");
+  const [area, setArea] = useState(ALL_AREAS);
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -451,12 +452,11 @@ export function App() {
     [spots],
   );
 
-  const neighborhoods = useMemo(() => {
-    const names = (spots ?? [])
-      .map((s) => s.neighborhood)
-      .filter((n): n is string => n != null);
-    return ["All areas", ...Array.from(new Set(names)).sort()];
-  }, [spots]);
+  // 170 raw neighborhood strings collapse to ~59 canonical areas (see lib/areas).
+  const neighborhoods = useMemo(
+    () => areaOptions((spots ?? []).map((s) => s.neighborhood)),
+    [spots],
+  );
 
   // fuse.js loads on the first search keystroke, not at boot — fuzzy matching
   // is dead weight for the (majority) of visits that never type a query.
@@ -535,10 +535,10 @@ export function App() {
     list = showDrafts ? list.filter((s) => s.hidden) : list.filter((s) => !s.hidden);
     if (price !== "any") list = list.filter((s) => s.price_level === Number(price));
     if (categories.size) list = list.filter((s) => matchesCategories(s, categories));
-    // Area filter groups related neighborhoods ("4 Kilo", "4 Kilo (Abrehot)",
-    // "Arat Kilo") and ranks by match specificity.
+    // Area filter matches on the canonical area, so "4 Kilo" also pulls
+    // "Arat Kilo" and "4 Kilo (Abrehot)"; spots naming the area outright rank first.
     const tier = new Map<Spot, number>();
-    if (area !== "All areas") {
+    if (area !== ALL_AREAS) {
       list = list.filter((s) => {
         const t = areaTier(s.neighborhood, area);
         if (t == null) return false;
@@ -732,7 +732,7 @@ export function App() {
   }, [reportWriteError]);
 
   const clearFilters = useCallback(() => {
-    setArea("All areas");
+    setArea(ALL_AREAS);
     setPrice("any");
     setQuery("");
     setCategories(new Set());
@@ -755,7 +755,7 @@ export function App() {
 
   const activeFilters =
     (query.trim() ? 1 : 0) +
-    (area !== "All areas" ? 1 : 0) +
+    (area !== ALL_AREAS ? 1 : 0) +
     (price !== "any" ? 1 : 0) +
     categories.size;
 
@@ -916,10 +916,16 @@ export function App() {
         </div>
         <div className="ctrl">
           <label>Area</label>
-          <Dropdown
+          <SearchableDropdown
             value={area}
             onChange={setArea}
-            options={neighborhoods.map((n) => ({ value: n, label: n }))}
+            options={neighborhoods.map((n) => ({
+              value: n,
+              label: n,
+              // typing "piazza" should find Piassa, "arat kilo" should find 4 Kilo
+              search: n === ALL_AREAS ? n.toLowerCase() : areaSearchText(n),
+            }))}
+            placeholder="Bole, Piassa, 4 Kilo…"
             ariaLabel="Area"
           />
         </div>

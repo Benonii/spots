@@ -317,6 +317,35 @@ body {
 .dd-opt:hover { background: var(--press); color: var(--ink); }
 .dd-opt.sel { color: var(--primary); font-weight: 600; background: var(--press); }
 .dd-check { color: var(--accent-text); font-size: 0.7812rem; flex: none; }
+
+/* dropdown that filters as you type — the area list is too long to scroll */
+.dd-search-menu { display: flex; flex-direction: column; max-height: 340px; overflow: hidden; padding: 0; }
+.dd-search {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 10px 12px; border-bottom: 1px solid var(--line);
+}
+.dd-search-icon { color: var(--muted); flex: none; }
+.dd-search-input {
+  flex: 1; min-width: 0; border: none; background: transparent; padding: 0;
+  font-family: var(--serif-b); color: var(--ink);
+  /* 16px exactly: anything smaller and iOS Safari zooms the page on focus */
+  font-size: 1rem;
+}
+.dd-search-input::placeholder { color: var(--muted); font-style: italic; }
+.dd-search-input:focus { outline: none; }
+.dd-search-list { overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
+/* keyboard cursor — distinct from `.sel`, which marks the current filter */
+.dd-opt.active { background: var(--press); color: var(--ink); }
+.dd-empty {
+  margin: 0; padding: 14px 11px; text-align: center;
+  font-family: var(--serif-b); font-size: 0.8438rem; color: var(--muted);
+}
+/* Transient confirmation on the Share button. The min-width holds the button's
+   size across the Share → Copied label swap, so the row doesn't reflow (and,
+   once wrapped, doesn't re-wrap) while the confirmation is up. */
+.action-btn.done { color: var(--accent-text); border-color: var(--accent-line); background: var(--accent-wash); }
+.share-btn { min-width: 5.75rem; justify-content: center; }
+
 .ctrl-spacer { flex: 1 1 auto; }
 .surprise {
   font-family: var(--serif-d); font-weight: 500; font-size: 0.9062rem; letter-spacing: 0.2px;
@@ -379,7 +408,8 @@ a.spot-cover:hover { filter: brightness(1.06); }
 .spot-loc { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 0.875rem; margin-top: 8px; }
 .loc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
 
-.spot-actions { display: flex; gap: 8px; margin-top: 13px; }
+/* wraps: four buttons don't fit one line on a narrow phone */
+.spot-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
 .action-btn {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--serif-b); font-size: 0.8125rem; font-weight: 600; text-decoration: none;
@@ -720,6 +750,25 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .near-link-label, .auth-btn-label { display: none; }
   .near-link { padding: 9px; gap: 0; --len: 9px; }
   .auth-btn { padding: 8px; gap: 0; }
+
+  /* Same treatment for the card's actions — four labelled pills wrap onto two
+     rows on a phone, so drop to icons and let the tooltips carry the words.
+     Sized to 44px, the minimum comfortable touch target: without the label the
+     pill's own padding leaves a ~31px button, which is a miss waiting to happen.
+     The share button's min-width goes with the label it was reserving room for. */
+  .action-label { display: none; }
+  /* space-evenly, not space-between: the row is 2–4 buttons depending on
+     whether the spot has a review video and whether its map is suppressed, and
+     space-between pins two lone buttons to opposite edges. */
+  .spot-actions { justify-content: space-evenly; }
+  .action-btn {
+    width: 44px; height: 44px; padding: 0; gap: 0;
+    justify-content: center; border-radius: 50%;
+  }
+  /* the glyph grows with the button — a 13px icon in a 44px target reads as a
+     mistake rather than as a deliberately large tap area */
+  .action-btn svg { width: 18px; height: 18px; }
+  .share-btn { min-width: 0; }
 }
 
 @media (max-width: 900px) {

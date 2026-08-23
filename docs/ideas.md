@@ -445,6 +445,57 @@ order — the pilot needs enough weekly actives that 3–5 venues see real volum
 
 ---
 
+## 5. Sharing
+
+Three things could be shareable — a spot, the "want to go" list, and "Places
+we've been". They look like one feature and are three, so they're split here.
+
+**Shipped: individual spots.** A share button on the card, copying
+`/?spot=<place_id>` — the deep link the carousel already honours for `/near`.
+Generic OG card, deliberately: dynamic per-spot preview images need a Vercel
+function serving per-route meta, since this is a SPA with a blanket rewrite to
+`index.html` and Telegram/WhatsApp scrapers don't run JS. Every shared link
+therefore previews as the site, not the spot. Called acceptable for v1.
+
+**Parked: "want to go".** There is no list entity — `saved_spots` is per-row
+bookmarks under owner-scoped RLS, so "my list" is just "all my rows". Sharing it
+means inventing the entity: either a `share_token` on profiles plus a security
+definer RPC (revocable, identity-free) or a `saved_public` flag plus a select
+policy (simpler, but on/off for your identity rather than a link you can
+retract). Not started.
+
+**Parked: invite-based "Places we've been".** The idea: invite a specific email,
+generate a token URL, they sign up, they see your log.
+
+The finding that stalled it — **an invite gate currently gates nothing.**
+`public read visits` is `to: authenticatedRole, using: true`, so any signed-in
+user already reads every visit log; that's what the community feed on the home
+page renders. So the feature is one of:
+
+- *Invite as onboarding link* — token URL → landing page → Google sign-in →
+  email matches → lands on the inviter's log. Visibility unchanged, since the
+  invitee signs up before seeing anything. One table, two security definer RPCs
+  (RLS can't evaluate a URL token), no policy rewrite.
+- *Visit logs actually go private* — rewrite the visits select policy around a
+  grants table. **This kills the community feed**, which is built on everyone
+  reading everyone. Matches survives either way; it runs on `saved_spots`
+  (`my_matches()`, migration 0020), not visits.
+
+Unresolved, and the reason it's parked: whether it's fine that any signed-in
+user can browse every user's visit log today. That's a product call, not a
+technical one.
+
+Two mechanics already decided, should it resume: bind the invite to an email
+rather than *sending* mail (no email infrastructure exists; the inviter sends
+the link over Telegram/WhatsApp, which is where sharing happens here anyway),
+and refuse a mismatched sign-in with "this invite was sent to a@b.com" rather
+than silently claiming it.
+
+**Promote when:** there's a reason to believe sharing drives signups — the spot
+share button is the cheap experiment that tells us.
+
+---
+
 ## Sequencing
 
 Ordered by (MAU impact) ÷ (effort × risk), not by ambition. **Restored
