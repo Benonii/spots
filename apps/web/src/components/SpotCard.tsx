@@ -4,6 +4,8 @@ import type { Dimensions, Spot } from "../lib/types";
 import { isNewSpot } from "../lib/categories";
 import { ETB, PRICE_LABELS, PRICE_RANGE_TEXT, coverGradient, coverSrcSet, mapsUrl } from "../lib/format";
 import { openTikTok } from "../lib/tiktok";
+import { shareLink, spotShareText, spotShareUrl } from "../lib/share";
+import { track } from "../lib/analytics";
 import { StarMeter } from "./Stars";
 import { SpotMatches } from "./SpotMatches";
 
@@ -51,6 +53,25 @@ function MapPinIcon() {
     >
       <path d="M12 21s-6.5-5.8-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.2 12 21 12 21z" />
       <circle cx="12" cy="10.5" r="2.3" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15.5V3.5M12 3.5 8 7.5M12 3.5l4 4" />
+      <path d="M5 12.5v6a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-6" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 12.5l5 5 10-10" />
     </svg>
   );
 }
@@ -256,6 +277,29 @@ export function SpotCard({
   // ----- mobile swipe (Tinder-style): drag horizontally to change spots -----
   const [dx, setDx] = useState(0);
   const [anim, setAnim] = useState(false);
+  // "Link copied" confirmation. Held in a ref so unmounting mid-timeout (swipe
+  // to the next card) doesn't set state on a gone component.
+  const [shared, setShared] = useState(false);
+  const sharedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (sharedTimer.current) clearTimeout(sharedTimer.current);
+  }, []);
+
+  const share = async () => {
+    const outcome = await shareLink({
+      title: spot.name,
+      text: spotShareText(spot.name, spot.neighborhood),
+      url: spotShareUrl(spot.google_place_id, window.location.origin),
+    });
+    if (outcome === "dismissed") return;
+    void track("spot_share", { id: spot.google_place_id, outcome });
+    // The OS sheet is its own confirmation; only the silent clipboard path
+    // needs the button to say something happened.
+    if (outcome !== "copied") return;
+    setShared(true);
+    if (sharedTimer.current) clearTimeout(sharedTimer.current);
+    sharedTimer.current = setTimeout(() => setShared(false), 2000);
+  };
   const [hint, setHint] = useState(() => {
     try {
       return !localStorage.getItem(SWIPED_KEY);
@@ -461,6 +505,9 @@ export function SpotCard({
             aria-pressed={isSaved}
           >
             <BookmarkIcon filled={isSaved} /> {isSaved ? "Saved" : "Save"}
+          </button>
+          <button className={"action-btn share-btn" + (shared ? " done" : "")} onClick={share}>
+            {shared ? <CheckIcon /> : <ShareIcon />} {shared ? "Copied" : "Share"}
           </button>
         </div>
 
