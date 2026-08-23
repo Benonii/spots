@@ -757,9 +757,13 @@ a.spot-cover:hover { filter: brightness(1.06); }
      pill's own padding leaves a ~31px button, which is a miss waiting to happen.
      The share button's min-width goes with the label it was reserving room for. */
   .action-label { display: none; }
+  /* space-evenly, not space-between: the row is 2–4 buttons depending on
+     whether the spot has a review video and whether its map is suppressed, and
+     space-between pins two lone buttons to opposite edges. */
+  .spot-actions { justify-content: space-evenly; }
   .action-btn {
     width: 44px; height: 44px; padding: 0; gap: 0;
-    justify-content: center; border-radius: 14px;
+    justify-content: center; border-radius: 50%;
   }
   /* the glyph grows with the button — a 13px icon in a 44px target reads as a
      mistake rather than as a deliberately large tap area */
