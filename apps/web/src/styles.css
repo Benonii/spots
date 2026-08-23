@@ -753,9 +753,17 @@ a.spot-cover:hover { filter: brightness(1.06); }
 
   /* Same treatment for the card's actions — four labelled pills wrap onto two
      rows on a phone, so drop to icons and let the tooltips carry the words.
+     Sized to 44px, the minimum comfortable touch target: without the label the
+     pill's own padding leaves a ~31px button, which is a miss waiting to happen.
      The share button's min-width goes with the label it was reserving room for. */
   .action-label { display: none; }
-  .action-btn { padding: 9px 12px; gap: 0; }
+  .action-btn {
+    width: 44px; height: 44px; padding: 0; gap: 0;
+    justify-content: center; border-radius: 14px;
+  }
+  /* the glyph grows with the button — a 13px icon in a 44px target reads as a
+     mistake rather than as a deliberately large tap area */
+  .action-btn svg { width: 18px; height: 18px; }
   .share-btn { min-width: 0; }
 }
 
