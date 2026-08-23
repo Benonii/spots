@@ -750,6 +750,13 @@ a.spot-cover:hover { filter: brightness(1.06); }
   .near-link-label, .auth-btn-label { display: none; }
   .near-link { padding: 9px; gap: 0; --len: 9px; }
   .auth-btn { padding: 8px; gap: 0; }
+
+  /* Same treatment for the card's actions — four labelled pills wrap onto two
+     rows on a phone, so drop to icons and let the tooltips carry the words.
+     The share button's min-width goes with the label it was reserving room for. */
+  .action-label { display: none; }
+  .action-btn { padding: 9px 12px; gap: 0; }
+  .share-btn { min-width: 0; }
 }
 
 @media (max-width: 900px) {

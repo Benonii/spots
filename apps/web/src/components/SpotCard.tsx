@@ -8,6 +8,7 @@ import { shareLink, spotShareText, spotShareUrl } from "../lib/share";
 import { track } from "../lib/analytics";
 import { StarMeter } from "./Stars";
 import { SpotMatches } from "./SpotMatches";
+import { Tooltip } from "./Tooltip";
 
 const SWIPED_KEY = "spots:swiped";
 
@@ -482,33 +483,55 @@ export function SpotCard({
 
         <div className="spot-actions">
           {spot.source_video_url && (
-            <a
-              className="action-btn"
-              href={spot.source_video_url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => openTikTok(e, spot.source_video_url!)}
-            >
-              <TikTokIcon /> Watch
-            </a>
+            <Tooltip label="Watch the review">
+              <a
+                className="action-btn"
+                href={spot.source_video_url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Watch the review"
+                onClick={(e) => openTikTok(e, spot.source_video_url!)}
+              >
+                <TikTokIcon /> <span className="action-label">Watch</span>
+              </a>
+            </Tooltip>
           )}
           {/* A super can suppress this when the spot's Maps link points somewhere
               wrong; the link itself stays, since dedup matches against it. */}
           {!spot.hide_map && (
-            <a className="action-btn" href={mapsUrl(spot)} target="_blank" rel="noreferrer">
-              <MapPinIcon /> Map
-            </a>
+            <Tooltip label="Open in Maps">
+              <a
+                className="action-btn"
+                href={mapsUrl(spot)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open in Maps"
+              >
+                <MapPinIcon /> <span className="action-label">Map</span>
+              </a>
+            </Tooltip>
           )}
-          <button
-            className={"action-btn save-btn" + (isSaved ? " on" : "")}
-            onClick={onToggleSaved}
-            aria-pressed={isSaved}
-          >
-            <BookmarkIcon filled={isSaved} /> {isSaved ? "Saved" : "Save"}
-          </button>
-          <button className={"action-btn share-btn" + (shared ? " done" : "")} onClick={share}>
-            {shared ? <CheckIcon /> : <ShareIcon />} {shared ? "Copied" : "Share"}
-          </button>
+          <Tooltip label={isSaved ? "Remove from Want to go" : "Save to Want to go"}>
+            <button
+              className={"action-btn save-btn" + (isSaved ? " on" : "")}
+              onClick={onToggleSaved}
+              aria-pressed={isSaved}
+              aria-label={isSaved ? "Remove from Want to go" : "Save to Want to go"}
+            >
+              <BookmarkIcon filled={isSaved} />{" "}
+              <span className="action-label">{isSaved ? "Saved" : "Save"}</span>
+            </button>
+          </Tooltip>
+          <Tooltip label={shared ? "Link copied" : "Share this spot"}>
+            <button
+              className={"action-btn share-btn" + (shared ? " done" : "")}
+              onClick={share}
+              aria-label={shared ? "Link copied" : "Share this spot"}
+            >
+              {shared ? <CheckIcon /> : <ShareIcon />}{" "}
+              <span className="action-label">{shared ? "Copied" : "Share"}</span>
+            </button>
+          </Tooltip>
         </div>
 
         {isSaved && onNeedOptIn && onLiked && (
