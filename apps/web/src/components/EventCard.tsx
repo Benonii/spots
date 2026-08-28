@@ -144,9 +144,10 @@ export function EventCard({
                 href={happening.ticket_url}
                 target="_blank"
                 rel="noreferrer"
+                aria-label="Tickets"
                 onClick={() => void track("happening_tickets", { id: happening.id })}
               >
-                <TicketIcon /> Tickets
+                <TicketIcon /> <span className="action-label">Tickets</span>
               </a>
             )}
             <a
@@ -154,18 +155,20 @@ export function EventCard({
               href={calendarUrl(happening)}
               target="_blank"
               rel="noreferrer"
+              aria-label="Add to calendar"
               onClick={() => void track("happening_calendar", { id: happening.id })}
             >
-              <CalendarPlusIcon /> Add to calendar
+              <CalendarPlusIcon /> <span className="action-label">Add to calendar</span>
             </a>
             <a
               className="action-btn"
               href={happening.source_url}
               target="_blank"
               rel="noreferrer"
+              aria-label="Open the post on Telegram"
               onClick={() => void track("happening_open", { id: happening.id })}
             >
-              <TelegramIcon /> Post
+              <TelegramIcon /> <span className="action-label">Post</span>
             </a>
           </div>
 
