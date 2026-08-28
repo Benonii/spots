@@ -21,8 +21,8 @@ export function AdminMenu({
   showDrafts: boolean;
   onAddSpot: () => void;
   onToggleDrafts: () => void;
-  /** Pending events awaiting review; null when the events deck isn't showing. */
-  reviewCount: number | null;
+  /** Pending events awaiting review. */
+  reviewCount: number;
   showReview: boolean;
   onToggleReview: () => void;
   onOpenTeam: () => void;
@@ -78,13 +78,11 @@ export function AdminMenu({
             {!showDrafts && draftCount > 0 && <span className="admin-item-count">{draftCount}</span>}
           </button>
         )}
-        {reviewCount !== null && (reviewCount > 0 || showReview) && (
-          <button type="button" className="admin-item" role="menuitem" onClick={run(onToggleReview)}>
-            <DraftIcon />
-            {showReview ? "Show published" : "Review events"}
-            {!showReview && reviewCount > 0 && <span className="admin-item-count">{reviewCount}</span>}
-          </button>
-        )}
+        <button type="button" className="admin-item" role="menuitem" onClick={run(onToggleReview)}>
+          <CalendarIcon />
+          {showReview ? "Show published events" : "Review events"}
+          {!showReview && reviewCount > 0 && <span className="admin-item-count">{reviewCount}</span>}
+        </button>
         {isSuper && (
           <button type="button" className="admin-item" role="menuitem" onClick={run(onOpenTeam)}>
             <TeamIcon /> Team &amp; access
@@ -118,6 +116,15 @@ function DraftIcon() {
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M7 3h7l5 5v13H7z" />
       <path d="M14 3v5h5M9.5 13h5M9.5 16.5h5" />
+    </svg>
+  );
+}
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
     </svg>
   );
 }

@@ -819,12 +819,12 @@ export function App() {
     [FuseCtor, happenings],
   );
 
-  // The review queue is fetched only for admins on the events deck: a handful
+  // The review queue is fetched for admins as soon as they're known: a handful
   // of rows, and it doubles as the menu's count.
   useEffect(() => {
-    if (!isAdmin || deck !== "events" || pendingEvents) return;
+    if (!isAdmin || pendingEvents) return;
     fetchPendingHappenings().then(setPendingEvents).catch(reportWriteError);
-  }, [isAdmin, deck, pendingEvents, reportWriteError]);
+  }, [isAdmin, pendingEvents, reportWriteError]);
 
   useEffect(() => {
     if (!isAdmin) setShowReview(false);
@@ -1030,9 +1030,15 @@ export function App() {
               showDrafts={showDrafts}
               onAddSpot={() => setEditing({ mode: "create" })}
               onToggleDrafts={() => setShowDrafts((d) => !d)}
-              reviewCount={deck === "events" ? (pendingEvents?.length ?? 0) : null}
-              showReview={showReview}
-              onToggleReview={() => setShowReview((r) => !r)}
+              reviewCount={pendingEvents?.length ?? 0}
+              showReview={deck === "events" && showReview}
+              onToggleReview={() => {
+                // From the spots deck this always opens the queue; on events it toggles.
+                if (deck !== "events") {
+                  setDeck("events");
+                  setShowReview(true);
+                } else setShowReview((r) => !r);
+              }}
               onOpenTeam={() => setTeamOpen(true)}
             />
           )}
