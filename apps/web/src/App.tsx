@@ -6,6 +6,7 @@ import type { CommunityVisit, Happening, HappeningReview, Role, Spot, VisitedEnt
 import {
   fetchFirstSpot,
   fetchHappenings,
+  fetchHappeningSource,
   fetchPendingHappenings,
   fetchSpots,
 } from "./lib/supabase";
@@ -844,18 +845,30 @@ export function App() {
     );
     const q = eventQuery.trim();
     if (q) {
-      // Fuse indexes the published deck only; the queue falls back to substring.
-      const hits = eventFuse && !showReview
-        ? new Set(eventFuse.search(q).map((r) => r.item.id))
-        : null;
-      const needle = q.toLowerCase();
-      list = list.filter((h) =>
-        hits
-          ? hits.has(h.id)
-          : `${h.title ?? ""} ${h.venue_name ?? ""} ${h.summary ?? ""}`
-              .toLowerCase()
-              .includes(needle),
-      );
+      // Same relevance rule as spots: exact title, then title prefix, then the
+      // fuzzy score; date order only breaks ties. Fuse indexes the published
+      // deck only, so the review queue takes the substring path.
+      const nq = q.toLowerCase();
+      const pin = (h: Happening) => {
+        const title = (h.title ?? "").toLowerCase();
+        return title === nq ? 0 : title.startsWith(nq) ? 1 : 2;
+      };
+      const rank = new Map<string, [pin: number, score: number]>();
+      if (eventFuse && !showReview) {
+        for (const r of eventFuse.search(q)) rank.set(r.item.id, [pin(r.item), r.score ?? 1]);
+      } else {
+        for (const h of list) {
+          const hay = `${h.title ?? ""} ${h.venue_name ?? ""} ${h.summary ?? ""} ${h.tags.join(" ")}`;
+          if (hay.toLowerCase().includes(nq)) rank.set(h.id, [pin(h), 0]);
+        }
+      }
+      list = list
+        .filter((h) => rank.has(h.id))
+        .sort((a, b) => {
+          const [pa, sa] = rank.get(a.id)!;
+          const [pb, sb] = rank.get(b.id)!;
+          return pa - pb || sa - sb;
+        });
     }
     return list;
   }, [happenings, pendingEvents, showReview, eventWhen, eventKinds, eventFreeOnly, eventQuery, eventFuse]);
@@ -900,6 +913,20 @@ export function App() {
   const eventFiltersOn =
     eventQuery.trim() !== "" || eventWhen !== "upcoming" || eventKinds.size > 0 || eventFreeOnly;
   const currentEvent = events[Math.min(eventIndex, Math.max(events.length - 1, 0))];
+
+  // A queue row already carries its source post; a published one fetches it.
+  const openEventEditor = async (h: Happening) => {
+    if ("raw_text" in h) {
+      setReviewing(h as HappeningReview);
+      return;
+    }
+    try {
+      const raw_text = await fetchHappeningSource(h.id);
+      setReviewing({ ...h, raw_text, status: "published" });
+    } catch (e) {
+      reportWriteError(e);
+    }
+  };
 
   const goEvent = useCallback(
     (delta: number) => {
@@ -1234,13 +1261,13 @@ export function App() {
           </div>
         ) : currentEvent ? (
           <div className="spot-stage">
-            {showReview && (
+            {isAdmin && (
               <button
                 type="button"
                 className="spot-edit-fab"
-                aria-label={`Review ${currentEvent.title ?? "event"}`}
-                title="Review this event"
-                onClick={() => setReviewing(currentEvent as HappeningReview)}
+                aria-label={`Edit ${currentEvent.title ?? "event"}`}
+                title={showReview ? "Review this event" : "Edit this event"}
+                onClick={() => void openEventEditor(currentEvent)}
               >
                 <PencilIcon />
               </button>
@@ -1432,11 +1459,12 @@ export function App() {
             userId={user.id}
             onClose={() => setReviewing(null)}
             onDecided={(verdict) => {
+              // Refetch both decks: either may have gained or lost this row, and
+              // an edit to a published event belongs in public view immediately.
+              const wasPublished = reviewing.status === "published";
               setReviewing(null);
-              // Refetch both: a "save for later" may have changed the date, and a
-              // publish belongs in the public deck immediately.
               setPendingEvents(null);
-              if (verdict === "published") setHappenings(null);
+              if (verdict === "published" || wasPublished) setHappenings(null);
             }}
           />
         </Suspense>

@@ -119,6 +119,7 @@ export function EventEditor({
     };
   }, [onClose]);
 
+  const published = happening.status === "published";
   const missing: string[] = [];
   if (!form.title.trim()) missing.push("a title");
   if (!form.startDate) missing.push("a start date");
@@ -155,7 +156,7 @@ export function EventEditor({
       >
         <header className="ed-head">
           <div>
-            <p className="ed-eyebrow">Review event</p>
+            <p className="ed-eyebrow">{published ? "Editing" : "Review event"}</p>
             <h2 id={titleId}>{happening.title ?? "Untitled event"}</h2>
           </div>
           <button className="ed-x" type="button" onClick={onClose} aria-label="Close">
@@ -305,20 +306,37 @@ export function EventEditor({
               {errorMsg}
             </p>
           )}
-          {missing.length > 0 && <p className="ed-missing">To publish, add {missing.join(", ")}.</p>}
+          {missing.length > 0 && (
+            <p className="ed-missing">
+              To {published ? "save" : "publish"}, add {missing.join(", ")}.
+            </p>
+          )}
 
+          {/* A published row: Save keeps it live, Unpublish sends it back to the
+              queue. A pending row: Publish, Save for later, or Reject. */}
           <div className="ed-actions">
             <span className="ed-left-actions">
               <button type="button" className="ed-delete" disabled={!!busy} onClick={() => void decide("rejected")}>
                 {busy === "rejected" ? "Rejecting…" : "Reject"}
               </button>
+              {published && (
+                <button type="button" className="ed-delete" disabled={!!busy} onClick={() => void decide("pending")}>
+                  {busy === "pending" ? "Unpublishing…" : "Unpublish"}
+                </button>
+              )}
             </span>
             <div className="ed-actions-right">
-              <button type="button" className="ed-cancel" disabled={!!busy} onClick={() => void decide("pending")}>
-                {busy === "pending" ? "Saving…" : "Save for later"}
-              </button>
+              {published ? (
+                <button type="button" className="ed-cancel" disabled={!!busy} onClick={onClose}>
+                  Cancel
+                </button>
+              ) : (
+                <button type="button" className="ed-cancel" disabled={!!busy} onClick={() => void decide("pending")}>
+                  {busy === "pending" ? "Saving…" : "Save for later"}
+                </button>
+              )}
               <button type="submit" className="ed-save" disabled={!canPublish}>
-                {busy === "published" ? "Publishing…" : "Publish"}
+                {busy === "published" ? "Saving…" : published ? "Save changes" : "Publish"}
               </button>
             </div>
           </div>

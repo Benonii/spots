@@ -127,5 +127,5 @@ export type Happening = {
   confidence: number | null;
 };
 
-/** A pending row in the admin review queue: the event plus the post it came from. */
-export type HappeningReview = Happening & { raw_text: string };
+/** A row open in the admin editor: the event, its status, and the post it came from. */
+export type HappeningReview = Happening & { raw_text: string; status: "pending" | "published" };

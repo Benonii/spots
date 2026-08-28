@@ -140,7 +140,22 @@ export async function fetchPendingHappenings(): Promise<HappeningReview[]> {
   return (data ?? []).map((row) => ({
     ...mapHappening(row),
     raw_text: (row as unknown as { raw_text: string }).raw_text,
+    status: "pending" as const,
   }));
+}
+
+/**
+ * The original post behind a published event, for editing it after the fact.
+ * Fetched on demand: the public deck never carries `raw_text`.
+ */
+export async function fetchHappeningSource(id: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("happenings")
+    .select("raw_text")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(error.message);
+  return (data as { raw_text: string }).raw_text;
 }
 
 const HAPPENING_COLUMNS =
