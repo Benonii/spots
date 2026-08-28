@@ -141,6 +141,58 @@ export async function setSpotHidden(spotId: string, hidden: boolean): Promise<vo
   if (error) throw new Error(error.message);
 }
 
+/* ── event review ───────────────────────────────────────────────────────── */
+
+/** What the review editor may change on a pending event. */
+export type HappeningDraft = {
+  title: string;
+  summary: string;
+  venue_name: string;
+  starts_at: string | null; // ISO
+  ends_at: string | null;
+  price_min: number | null;
+  price_max: number | null;
+  ticket_url: string;
+  tags: string[];
+};
+
+export type HappeningVerdict = "published" | "rejected" | "pending";
+
+/**
+ * Save the reviewer's edits and, optionally, decide the row. One update so an
+ * edit-and-publish can't half-apply. `reviewed_at`/`reviewed_by` are stamped
+ * only on a decision: a row saved but left pending is still unreviewed, and
+ * `publish --above` on the CLI treats it as such.
+ */
+export async function reviewHappening(
+  id: string,
+  userId: string,
+  draft: HappeningDraft,
+  verdict: HappeningVerdict,
+): Promise<void> {
+  const blank = (v: string) => (v.trim() ? v.trim() : null);
+  const patch: Record<string, unknown> = {
+    title: blank(draft.title),
+    summary: blank(draft.summary),
+    venue_name: blank(draft.venue_name),
+    starts_at: draft.starts_at,
+    ends_at: draft.ends_at,
+    price_min: draft.price_min,
+    price_max: draft.price_max,
+    ticket_url: blank(draft.ticket_url),
+    tags: draft.tags,
+    status: verdict,
+    updated_at: new Date().toISOString(),
+  };
+  if (verdict !== "pending") {
+    patch.reviewed_at = patch.updated_at;
+    patch.reviewed_by = userId;
+    patch.rejected_reason = verdict === "rejected" ? "rejected in review" : null;
+  }
+  const { error } = await supabase.from("happenings").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 /** Hard-delete a spot. RLS only permits this for manual spots you may remove. */
 export async function deleteSpot(spotId: string): Promise<void> {
   const { error } = await supabase.from("spots").delete().eq("id", spotId);

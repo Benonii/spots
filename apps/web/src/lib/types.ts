@@ -126,3 +126,6 @@ export type Happening = {
   tags: string[];
   confidence: number | null;
 };
+
+/** A pending row in the admin review queue: the event plus the post it came from. */
+export type HappeningReview = Happening & { raw_text: string };
