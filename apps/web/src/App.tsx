@@ -901,10 +901,13 @@ export function App() {
     eventQuery.trim() !== "" || eventWhen !== "upcoming" || eventKinds.size > 0 || eventFreeOnly;
   const currentEvent = events[Math.min(eventIndex, Math.max(events.length - 1, 0))];
 
-  const goEvent = (delta: number) => {
-    if (!events.length) return;
-    setEventIndex((i) => (i + delta + events.length) % events.length);
-  };
+  const goEvent = useCallback(
+    (delta: number) => {
+      if (!events.length) return;
+      setEventIndex((i) => (i + delta + events.length) % events.length);
+    },
+    [events.length],
+  );
 
   // jump the carousel to a specific spot (clearing filters first if it's hidden)
   const goToSpot = useCallback(
@@ -947,12 +950,13 @@ export function App() {
     const h = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
-      if (e.key === "ArrowLeft") go(-1);
-      if (e.key === "ArrowRight") go(1);
+      const step = deck === "events" ? goEvent : go;
+      if (e.key === "ArrowLeft") step(-1);
+      if (e.key === "ArrowRight") step(1);
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [go]);
+  }, [deck, go, goEvent]);
 
   if (error) {
     const offline = typeof navigator !== "undefined" && !navigator.onLine;
