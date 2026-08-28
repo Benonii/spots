@@ -13,6 +13,20 @@ import {
 } from "../lib/happenings";
 import { useSwipeDeck } from "../lib/swipe";
 import { track } from "../lib/analytics";
+import { Tooltip } from "./Tooltip";
+
+// Shared with SpotCard: one swipe on either deck retires the hint on both.
+const SWIPED_KEY = "spots:swiped";
+
+function SwipeHintIcon() {
+  return (
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 2 1 6l4 4" />
+      <path d="M21 2l4 4-4 4" />
+    </svg>
+  );
+}
 
 function TicketIcon() {
   return (
@@ -73,7 +87,25 @@ export function EventCard({
   onNext: () => void;
 }) {
   const [flyerFailed, setFlyerFailed] = useState(false);
-  const swipe = useSwipeDeck({ onPrev, onNext });
+  const [hint, setHint] = useState(() => {
+    try {
+      return !localStorage.getItem(SWIPED_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const swipe = useSwipeDeck({
+    onPrev,
+    onNext,
+    onFirstSwipe: () => {
+      setHint(false);
+      try {
+        localStorage.setItem(SWIPED_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+    },
+  });
 
   const { title, venueUsed } = heading(happening);
   const time = timeLabel(happening.starts_at);
@@ -122,6 +154,11 @@ export function EventCard({
           )}
           <span className="cover-area">{dayLabel(happening.starts_at)}</span>
           {time && <span className="cover-count">{time}</span>}
+          {hint && (
+            <span className="swipe-hint" aria-hidden="true">
+              <SwipeHintIcon /> Swipe to browse
+            </span>
+          )}
         </a>
 
         <div className="spot-left">
@@ -139,6 +176,7 @@ export function EventCard({
 
           <div className="spot-actions">
             {happening.ticket_url && (
+              <Tooltip label={ticketHost ? `Tickets via ${ticketHost}` : "Get tickets"}>
               <a
                 className="action-btn"
                 href={happening.ticket_url}
@@ -149,7 +187,9 @@ export function EventCard({
               >
                 <TicketIcon /> <span className="action-label">Tickets</span>
               </a>
+              </Tooltip>
             )}
+            <Tooltip label="Add to Google Calendar">
             <a
               className="action-btn"
               href={calendarUrl(happening)}
@@ -160,6 +200,8 @@ export function EventCard({
             >
               <CalendarPlusIcon /> <span className="action-label">Add to calendar</span>
             </a>
+            </Tooltip>
+            <Tooltip label="Open the post on Telegram">
             <a
               className="action-btn"
               href={happening.source_url}
@@ -170,6 +212,7 @@ export function EventCard({
             >
               <TelegramIcon /> <span className="action-label">Post</span>
             </a>
+            </Tooltip>
           </div>
 
           {happening.summary && <p className="spot-summary">{happening.summary}</p>}
