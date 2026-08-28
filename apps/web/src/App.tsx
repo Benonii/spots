@@ -2,10 +2,11 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link } from "@tanstack/react-router";
 import type Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
-import type { CommunityVisit, Happening, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import type { CommunityVisit, Happening, HappeningReview, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
 import {
   fetchFirstSpot,
   fetchHappenings,
+  fetchPendingHappenings,
   fetchSpots,
 } from "./lib/supabase";
 import { signInWithGoogle, signOut, supabase } from "./lib/supabase";
@@ -55,6 +56,9 @@ import { Tooltip } from "./components/Tooltip";
 // The events deck is opt-in, so its card stays out of the landing bundle.
 const EventCard = lazy(() =>
   import("./components/EventCard").then((m) => ({ default: m.EventCard })),
+);
+const EventEditor = lazy(() =>
+  import("./components/EventEditor").then((m) => ({ default: m.EventEditor })),
 );
 const SpotEditor = lazy(() =>
   import("./components/SpotEditor").then((m) => ({ default: m.SpotEditor })),
@@ -239,6 +243,10 @@ export function App() {
   const [matchesSeenAt, setMatchesSeenAt] = useState(0);
   // admins can flip the carousel into a review queue of hidden draft spots
   const [showDrafts, setShowDrafts] = useState(false);
+  // ...and the events deck into a queue of pending events, each opening an editor
+  const [showReview, setShowReview] = useState(false);
+  const [pendingEvents, setPendingEvents] = useState<HappeningReview[] | null>(null);
+  const [reviewing, setReviewing] = useState<HappeningReview | null>(null);
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -811,10 +819,24 @@ export function App() {
     [FuseCtor, happenings],
   );
 
+  // The review queue is fetched only for admins on the events deck: a handful
+  // of rows, and it doubles as the menu's count.
+  useEffect(() => {
+    if (!isAdmin || deck !== "events" || pendingEvents) return;
+    fetchPendingHappenings().then(setPendingEvents).catch(reportWriteError);
+  }, [isAdmin, deck, pendingEvents, reportWriteError]);
+
+  useEffect(() => {
+    if (!isAdmin) setShowReview(false);
+  }, [isAdmin]);
+
   const events = useMemo(() => {
-    if (!happenings) return [];
+    // In review mode every row shows, undeduped — a reviewer has to see the
+    // duplicate to reject it.
+    const source = showReview ? pendingEvents : happenings;
+    if (!source) return [];
     const now = new Date();
-    let list = dedupe(happenings).filter(
+    let list = (showReview ? source : dedupe(source)).filter(
       (h) =>
         matchesWhen(h, eventWhen, now) &&
         matchesKinds(h, eventKinds) &&
@@ -822,7 +844,8 @@ export function App() {
     );
     const q = eventQuery.trim();
     if (q) {
-      const hits = eventFuse
+      // Fuse indexes the published deck only; the queue falls back to substring.
+      const hits = eventFuse && !showReview
         ? new Set(eventFuse.search(q).map((r) => r.item.id))
         : null;
       const needle = q.toLowerCase();
@@ -835,13 +858,13 @@ export function App() {
       );
     }
     return list;
-  }, [happenings, eventWhen, eventKinds, eventFreeOnly, eventQuery, eventFuse]);
+  }, [happenings, pendingEvents, showReview, eventWhen, eventKinds, eventFreeOnly, eventQuery, eventFuse]);
 
   // Any filter change re-aims the deck at the first match rather than leaving
   // it parked on an index that now points at something else.
   useEffect(() => {
     setEventIndex(0);
-  }, [eventWhen, eventKinds, eventFreeOnly, eventQuery]);
+  }, [eventWhen, eventKinds, eventFreeOnly, eventQuery, showReview]);
 
   const toggleEventKind = (key: string) =>
     setEventKinds((prev) => {
@@ -1003,6 +1026,9 @@ export function App() {
               showDrafts={showDrafts}
               onAddSpot={() => setEditing({ mode: "create" })}
               onToggleDrafts={() => setShowDrafts((d) => !d)}
+              reviewCount={deck === "events" ? (pendingEvents?.length ?? 0) : null}
+              showReview={showReview}
+              onToggleReview={() => setShowReview((r) => !r)}
               onOpenTeam={() => setTeamOpen(true)}
             />
           )}
@@ -1192,6 +1218,17 @@ export function App() {
           </div>
         ) : currentEvent ? (
           <div className="spot-stage">
+            {showReview && (
+              <button
+                type="button"
+                className="spot-edit-fab"
+                aria-label={`Review ${currentEvent.title ?? "event"}`}
+                title="Review this event"
+                onClick={() => setReviewing(currentEvent as HappeningReview)}
+              >
+                <PencilIcon />
+              </button>
+            )}
             <Suspense fallback={<SkeletonCard />}>
               <EventCard
                 happening={currentEvent}
@@ -1204,7 +1241,12 @@ export function App() {
           </div>
         ) : (
           <div className="noresults">
-            {eventFiltersOn ? (
+            {showReview ? (
+              <>
+                Nothing waiting for review.{" "}
+                <button onClick={() => setShowReview(false)}>Show published</button>
+              </>
+            ) : eventFiltersOn ? (
               <>
                 No events match these filters.{" "}
                 <button onClick={clearEventFilters}>Clear filters</button>
@@ -1365,6 +1407,23 @@ export function App() {
         </section>
       )}
       </>
+      )}
+
+      {reviewing && user && (
+        <Suspense fallback={null}>
+          <EventEditor
+            happening={reviewing}
+            userId={user.id}
+            onClose={() => setReviewing(null)}
+            onDecided={(verdict) => {
+              setReviewing(null);
+              // Refetch both: a "save for later" may have changed the date, and a
+              // publish belongs in the public deck immediately.
+              setPendingEvents(null);
+              if (verdict === "published") setHappenings(null);
+            }}
+          />
+        </Suspense>
       )}
 
       {editing && user && (

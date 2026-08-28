@@ -1586,3 +1586,9 @@ body .sl-footer a:hover { color: var(--ink-soft); }
 .sm-list-sheet { gap: 0; }
 .sm-list-sheet .sm-row { padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
 .sm-list-sheet .sm-row:last-child { border-bottom: 0; }
+
+/* ── event review editor ─────────────────────────────────────────────────── */
+.ed-tagset { flex-wrap: wrap; gap: 2px; }
+.ed-source { display: flex; flex-direction: column; gap: 7px; }
+.ed-source-text { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 0.8438rem; line-height: 1.5; color: var(--ink-soft); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.ed-source-link { align-self: flex-start; font-size: 0.8125rem; font-weight: 600; color: var(--green); }
