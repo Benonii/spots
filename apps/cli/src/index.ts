@@ -21,6 +21,7 @@ import { happeningsCommand } from "./commands/happenings.ts";
 import { analyticsCommand } from "./commands/analytics.ts";
 import { adminCommand } from "./commands/admin.ts";
 import { backupCommand } from "./commands/backup.ts";
+import { sqlCommand } from "./commands/sql.ts";
 import {
   migrateCommand,
   generateCommand,
@@ -45,6 +46,7 @@ const main = defineCommand({
     analytics: analyticsCommand,
     admin: adminCommand,
     backup: backupCommand,
+    sql: sqlCommand,
     migrate: migrateCommand,
     generate: generateCommand,
     push: pushCommand,
