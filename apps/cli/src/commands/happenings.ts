@@ -1,5 +1,8 @@
 /**
- * `spots happenings poll` — Telegram channel → happenings (raw, unextracted).
+ * `spots happenings` — Telegram channel → happenings.
+ *
+ *   poll     fetch raw posts (free)
+ *   extract  LLM → structured event fields + routing (billed)
  *
  * Walks a channel's public preview page backwards until it reaches posts it
  * already has, inserting each new one with `status = 'pending'` and no
@@ -15,9 +18,28 @@
  */
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { and, eq, inArray } from "drizzle-orm";
+import { generateObject } from "ai";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import pLimit from "p-limit";
 import type { NewHappening } from "@spots/db";
 import { db, schema } from "../db.ts";
+import { requireKeys } from "../env.ts";
+import {
+  ensureCoversBucket,
+  isRehosted,
+  rehostFlyer,
+} from "../lib/storage.ts";
+import { getModel } from "../lib/llm.ts";
+import {
+  happeningExtractionSchema,
+  EXTRACTION_SYSTEM,
+  parseEventDate,
+  route,
+  buildPrompt,
+  addisDate,
+  settleStatus,
+  type HappeningExtraction,
+} from "../happenings-extraction.ts";
 import { fetchChannelPage, type TelegramPost } from "../lib/telegram.ts";
 import { sleep, jitter } from "../lib/throttle.ts";
 
@@ -56,6 +78,10 @@ const poll = defineCommand({
     pages: {
       type: "string",
       description: `Max pages to walk back (default ${DEFAULT_MAX_PAGES}, 20 posts each)`,
+    },
+    backfill: {
+      type: "boolean",
+      description: "Keep walking past posts we already have, to --pages depth",
     },
   },
   async run({ args }) {
@@ -155,7 +181,10 @@ const poll = defineCommand({
       // page: photo-only posts are never inserted, so a page made entirely of
       // them has nothing new by definition and would end the walk early —
       // truncating a backfill that hasn't actually caught up yet.
-      if (usable.length && !fresh.length) break;
+      //
+      // --backfill is the deliberate opposite: reaching into history means
+      // walking straight through the posts we already hold.
+      if (!args.backfill && usable.length && !fresh.length) break;
 
       before = Math.min(...posts.map((post) => post.messageId));
       await sleep(jitter(2000, 5000));
@@ -176,7 +205,368 @@ const poll = defineCommand({
   },
 });
 
+const CONCURRENCY = 4;
+
+const extract = defineCommand({
+  meta: {
+    name: "extract",
+    description: "LLM: pull event details out of polled posts (billed)",
+  },
+  args: {
+    limit: { type: "string", description: "Max posts to process" },
+    all: {
+      type: "boolean",
+      description: "Re-extract every post (after a prompt change) — re-bills",
+    },
+    "retry-failed": {
+      type: "boolean",
+      description: "Re-extract only posts whose previous extraction errored",
+    },
+    "publish-above": {
+      type: "string",
+      description:
+        "Auto-publish dated future events at or above this confidence (0..1). Omitted = everything goes to review.",
+    },
+  },
+  async run({ args }) {
+    const limit = args.limit ? Number(args.limit) : undefined;
+    if (limit !== undefined && (Number.isNaN(limit) || limit <= 0)) {
+      consola.error("--limit must be a positive number");
+      process.exitCode = 1;
+      return;
+    }
+
+    // No default threshold on purpose. Picking one before there is a sample to
+    // calibrate against would be inventing a number, and the cost of getting it
+    // wrong is a wrong event in front of users. Until it's set, every event
+    // waits for a human.
+    const publishAbove =
+      args["publish-above"] !== undefined ? Number(args["publish-above"]) : null;
+    if (
+      publishAbove !== null &&
+      (Number.isNaN(publishAbove) || publishAbove < 0 || publishAbove > 1)
+    ) {
+      consola.error("--publish-above must be between 0 and 1");
+      process.exitCode = 1;
+      return;
+    }
+
+    const model = getModel(); // validates LLM_MODEL + key before spending
+
+    let query = db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        rawText: schema.happenings.rawText,
+        postedAt: schema.happenings.postedAt,
+        status: schema.happenings.status,
+      })
+      .from(schema.happenings)
+      .$dynamic();
+
+    if (args["retry-failed"]) {
+      // A failed extraction is stamped but wrote no verdict, so `is_event is
+      // null` after `extracted_at` is set is exactly the errored set.
+      query = query.where(
+        and(
+          sql`${schema.happenings.extractedAt} is not null`,
+          isNull(schema.happenings.isEvent),
+        ),
+      );
+    } else if (!args.all) {
+      query = query.where(isNull(schema.happenings.extractedAt));
+    }
+    query = query.orderBy(sql`${schema.happenings.sourceMessageId} desc`);
+    if (limit !== undefined) query = query.limit(limit);
+
+    const posts = await query;
+    if (!posts.length) {
+      consola.info("Nothing to extract.");
+      return;
+    }
+
+    consola.info(
+      `Extracting ${posts.length} posts (concurrency ${CONCURRENCY})…${
+        publishAbove === null
+          ? " Everything routes to review — pass --publish-above to auto-publish."
+          : ` Auto-publishing at confidence ≥ ${publishAbove}.`
+      }`,
+    );
+
+    const run = pLimit(CONCURRENCY);
+    const tally = { published: 0, pending: 0, rejected: 0, failed: 0 };
+
+    await Promise.all(
+      posts.map((post) =>
+        run(async () => {
+          const now = new Date();
+          try {
+            const { object } = await generateObject({
+              model,
+              schema: happeningExtractionSchema,
+              temperature: 0,
+              system: EXTRACTION_SYSTEM,
+              prompt: buildPrompt(post.postedAt, post.rawText),
+            });
+
+            const startsAt = parseEventDate(object.startsAt, now);
+            const endsAt = parseEventDate(object.endsAt, now);
+            const routed = route(object, startsAt, endsAt, now, publishAbove);
+
+            const verdict = settleStatus(post.status, routed, object.isEvent, startsAt);
+
+            await db
+              .update(schema.happenings)
+              .set({
+                isEvent: object.isEvent,
+                title: object.title,
+                summary: object.summary,
+                venueName: object.venueName,
+                startsAt,
+                endsAt,
+                priceMin: object.priceMin?.toString() ?? null,
+                priceMax: object.priceMax?.toString() ?? null,
+                ticketUrl: object.ticketUrl,
+                tags: object.tags,
+                confidence: object.confidence.toString(),
+                extractedAt: now,
+                status: verdict.status,
+                rejectedReason: verdict.rejectedReason,
+                updatedAt: now,
+              })
+              .where(eq(schema.happenings.id, post.id));
+
+            tally[verdict.status as keyof typeof tally]++;
+            const when = startsAt ? addisDate(startsAt) : "no date";
+            const label = object.isEvent
+              ? `${object.title ?? "(untitled)"} · ${when} · ${object.confidence.toFixed(2)} · ${object.tags.join("/") || "untagged"}`
+              : "(not an event)";
+            consola.log(`  ${post.messageId} ${verdict.status.padEnd(9)} ${label}`);
+          } catch (error) {
+            tally.failed++;
+            // Stamp anyway. Every billed stage in this pipeline records the
+            // attempt so a re-run can't silently re-spend on the same row; the
+            // deliberate retry path is --retry-failed, which finds these by
+            // their absent verdict.
+            await db
+              .update(schema.happenings)
+              .set({ extractedAt: now, updatedAt: now })
+              .where(eq(schema.happenings.id, post.id));
+            const reason =
+              (error instanceof Error ? error.message : String(error))
+                .trim()
+                .split("\n")
+                .filter(Boolean)
+                .pop() ?? "unknown error";
+            consola.warn(`  ${post.messageId} failed: ${reason}`);
+          }
+        }),
+      ),
+    );
+
+    consola.success(
+      `Extracted ${posts.length}: ${tally.published} published, ${tally.pending} to review, ${tally.rejected} rejected, ${tally.failed} failed`,
+    );
+    if (tally.failed) process.exitCode = 1;
+  },
+});
+
+const publish = defineCommand({
+  meta: {
+    name: "publish",
+    description: "Re-route already-extracted posts at a confidence threshold (free)",
+  },
+  args: {
+    above: {
+      type: "string",
+      description: "Publish dated future events at or above this confidence (0..1)",
+      required: true,
+    },
+    "dry-run": {
+      type: "boolean",
+      description: "Show what would change without writing",
+    },
+  },
+  async run({ args }) {
+    const threshold = Number(args.above);
+    if (Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
+      consola.error("--above must be between 0 and 1");
+      process.exitCode = 1;
+      return;
+    }
+
+    // Deliberately does not call the LLM. Choosing a threshold is something you
+    // do repeatedly while calibrating, and re-running `extract --all` to change
+    // one number would re-bill the whole table for output we already have.
+    // Rows a human has already ruled on are left alone.
+    const rows = await db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        title: schema.happenings.title,
+        isEvent: schema.happenings.isEvent,
+        startsAt: schema.happenings.startsAt,
+        endsAt: schema.happenings.endsAt,
+        confidence: schema.happenings.confidence,
+        status: schema.happenings.status,
+      })
+      .from(schema.happenings)
+      .where(
+        and(
+          sql`${schema.happenings.extractedAt} is not null`,
+          isNull(schema.happenings.reviewedAt),
+        ),
+      )
+      .orderBy(sql`${schema.happenings.startsAt} asc nulls last`);
+
+    if (!rows.length) {
+      consola.info("Nothing extracted to route.");
+      return;
+    }
+
+    const now = new Date();
+    let changed = 0;
+    const tally = { published: 0, pending: 0, rejected: 0 };
+
+    for (const row of rows) {
+      const routed = route(
+        {
+          isEvent: row.isEvent ?? false,
+          confidence: Number(row.confidence ?? 0),
+        } as HappeningExtraction,
+        row.startsAt,
+        row.endsAt,
+        now,
+        threshold,
+      );
+      tally[routed.status]++;
+      if (routed.status === row.status) continue;
+      changed++;
+      consola.log(
+        `  ${row.messageId} ${row.status} → ${routed.status.padEnd(9)} ${row.title ?? "(untitled)"}`,
+      );
+      if (!args["dry-run"]) {
+        await db
+          .update(schema.happenings)
+          .set({
+            status: routed.status,
+            rejectedReason: routed.rejectedReason,
+            updatedAt: now,
+          })
+          .where(eq(schema.happenings.id, row.id));
+      }
+    }
+
+    const summary = `${tally.published} published, ${tally.pending} to review, ${tally.rejected} rejected (${changed} changed)`;
+    if (args["dry-run"]) consola.info(`Would be: ${summary}`);
+    else consola.success(summary);
+  },
+});
+
+const flyers = defineCommand({
+  meta: {
+    name: "flyers",
+    description: "Re-host event flyers into Storage (Telegram's links expire in ~a day)",
+  },
+  args: {
+    channel: { type: "string", description: `Channel handle (default ${DEFAULT_CHANNEL})` },
+    pages: {
+      type: "string",
+      description: `Max pages to search for fresh links (default ${DEFAULT_MAX_PAGES})`,
+    },
+    force: { type: "boolean", description: "Re-host flyers already on Storage" },
+  },
+  async run({ args }) {
+    requireKeys("SUPABASE_URL", "SUPABASE_SECRET_KEY");
+    await ensureCoversBucket();
+
+    const channel = normalizeChannel(args.channel ?? DEFAULT_CHANNEL);
+    const maxPages = args.pages ? Number(args.pages) : DEFAULT_MAX_PAGES;
+    if (!Number.isInteger(maxPages) || maxPages <= 0) {
+      consola.error("--pages must be a positive integer");
+      process.exitCode = 1;
+      return;
+    }
+
+    // Rows still pointing at Telegram (or at nothing). A flyer already on
+    // Storage is permanent, so it never needs revisiting.
+    const rows = await db
+      .select({
+        id: schema.happenings.id,
+        messageId: schema.happenings.sourceMessageId,
+        imageUrl: schema.happenings.imageUrl,
+      })
+      .from(schema.happenings)
+      .where(eq(schema.happenings.sourceChannel, channel))
+      .orderBy(sql`${schema.happenings.sourceMessageId} desc`);
+
+    const wanted = new Map(
+      rows
+        .filter((row) => args.force || !isRehosted(row.imageUrl))
+        .map((row) => [row.messageId, row]),
+    );
+    if (!wanted.size) {
+      consola.info("Every flyer is already on Storage.");
+      return;
+    }
+    consola.start(`Re-hosting ${wanted.size} flyers from t.me/s/${channel}…`);
+
+    // The stored links are mostly dead, so the channel page is re-read for
+    // fresh ones. Walking stops as soon as every wanted post has been seen —
+    // the ids are monotonic, so once we're past the oldest one there is nothing
+    // left to find.
+    const oldest = Math.min(...wanted.keys());
+    let before: number | undefined;
+    let hosted = 0;
+    let missed = 0;
+
+    for (let page = 0; page < maxPages && wanted.size; page++) {
+      let posts: TelegramPost[];
+      try {
+        posts = await fetchChannelPage(channel, before);
+      } catch (error) {
+        consola.error(
+          `Page fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exitCode = 1;
+        break;
+      }
+      if (!posts.length) break;
+
+      for (const post of posts) {
+        const row = wanted.get(post.messageId);
+        if (!row || !post.imageUrl) continue;
+        wanted.delete(post.messageId);
+        const url = await rehostFlyer(row.id, post.imageUrl);
+        if (!url) {
+          missed++;
+          consola.warn(`  ${post.messageId} flyer fetch failed`);
+          continue;
+        }
+        await db
+          .update(schema.happenings)
+          .set({ imageUrl: url, updatedAt: new Date() })
+          .where(eq(schema.happenings.id, row.id));
+        hosted++;
+        consola.log(`  ${post.messageId} ✓`);
+      }
+
+      const lowest = Math.min(...posts.map((post) => post.messageId));
+      if (lowest <= oldest) break;
+      before = lowest;
+      await sleep(jitter(2000, 5000));
+    }
+
+    // Posts whose flyer we never found: deleted from the channel, or older than
+    // the walk reached. They keep whatever URL they had.
+    const unseen = wanted.size;
+    consola.success(
+      `${hosted} flyers on Storage${missed ? `, ${missed} failed` : ""}${unseen ? `, ${unseen} not found on the channel` : ""}`,
+    );
+  },
+});
+
 export const happeningsCommand = defineCommand({
   meta: { name: "happenings", description: "Events scraped from Telegram" },
-  subCommands: { poll },
+  subCommands: { poll, extract, publish, flyers },
 });

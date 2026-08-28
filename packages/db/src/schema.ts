@@ -787,6 +787,13 @@ export const happenings = pgTable(
     priceMax: numeric("price_max"),
     priceCurrency: text("price_currency").notNull().default("ETB"),
     ticketUrl: text("ticket_url"),
+    // Fixed vocabulary — the app's filter chips are built from it, so a novel
+    // value would be a chip nobody can ever select. Enforced by the Zod
+    // extraction schema, not just asked for in the prompt.
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
     // The channel posts plenty of non-events (job ads, course announcements,
     // news). This is the gate that keeps them out, separate from `confidence`:
     // a post can be confidently not-an-event.
@@ -828,6 +835,7 @@ export const happenings = pgTable(
       .where(sql`extracted_at is null`),
     // Review queue.
     index("happenings_status_idx").on(t.status),
+    index("happenings_tags_idx").using("gin", t.tags),
     check(
       "happenings_status_check",
       sql`${t.status} in ('pending','published','rejected')`,

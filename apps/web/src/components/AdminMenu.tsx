@@ -11,6 +11,9 @@ export function AdminMenu({
   showDrafts,
   onAddSpot,
   onToggleDrafts,
+  reviewCount,
+  showReview,
+  onToggleReview,
   onOpenTeam,
 }: {
   isSuper: boolean;
@@ -18,6 +21,10 @@ export function AdminMenu({
   showDrafts: boolean;
   onAddSpot: () => void;
   onToggleDrafts: () => void;
+  /** Pending events awaiting review; null when the events deck isn't showing. */
+  reviewCount: number | null;
+  showReview: boolean;
+  onToggleReview: () => void;
   onOpenTeam: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -69,6 +76,13 @@ export function AdminMenu({
             <DraftIcon />
             {showDrafts ? "Show published" : "Review drafts"}
             {!showDrafts && draftCount > 0 && <span className="admin-item-count">{draftCount}</span>}
+          </button>
+        )}
+        {reviewCount !== null && (reviewCount > 0 || showReview) && (
+          <button type="button" className="admin-item" role="menuitem" onClick={run(onToggleReview)}>
+            <DraftIcon />
+            {showReview ? "Show published" : "Review events"}
+            {!showReview && reviewCount > 0 && <span className="admin-item-count">{reviewCount}</span>}
           </button>
         )}
         {isSuper && (

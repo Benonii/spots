@@ -2,8 +2,23 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link } from "@tanstack/react-router";
 import type Fuse from "fuse.js";
 import type { User } from "@supabase/supabase-js";
-import type { CommunityVisit, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
-import { fetchFirstSpot, fetchSpots, signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import type { CommunityVisit, Happening, HappeningReview, Role, Spot, VisitedEntry, VisitPatch } from "./lib/types";
+import {
+  fetchFirstSpot,
+  fetchHappenings,
+  fetchPendingHappenings,
+  fetchSpots,
+} from "./lib/supabase";
+import { signInWithGoogle, signOut, supabase } from "./lib/supabase";
+import {
+  dedupe,
+  EVENT_KINDS,
+  EVENT_WHEN_OPTIONS,
+  isFree,
+  matchesKinds,
+  matchesWhen,
+  type EventWhen,
+} from "./lib/happenings";
 import { fetchMyRole } from "./lib/curation";
 import {
   createVisit,
@@ -39,6 +54,13 @@ import { BrandMark } from "./components/BrandMark";
 import { Tooltip } from "./components/Tooltip";
 // Admin-only surfaces: split into on-demand chunks so regular visitors never
 // download them; fetched the moment the modal is opened.
+// The events deck is opt-in, so its card stays out of the landing bundle.
+const EventCard = lazy(() =>
+  import("./components/EventCard").then((m) => ({ default: m.EventCard })),
+);
+const EventEditor = lazy(() =>
+  import("./components/EventEditor").then((m) => ({ default: m.EventEditor })),
+);
 const SpotEditor = lazy(() =>
   import("./components/SpotEditor").then((m) => ({ default: m.SpotEditor })),
 );
@@ -79,6 +101,16 @@ function SearchIcon() {
       strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" />
       <path d="M13 13l-2.7-2.7" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
     </svg>
   );
 }
@@ -164,6 +196,15 @@ export function App() {
   const [price, setPrice] = useState("any");
   const [sort, setSort] = useState("quality");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Which deck is on screen. Events are a peer of spots, not a side page.
+  const [deck, setDeck] = useState<"spots" | "events">("spots");
+  const [happenings, setHappenings] = useState<Happening[] | null>(null);
+  const [eventIndex, setEventIndex] = useState(0);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventWhen, setEventWhen] = useState<EventWhen>("upcoming");
+  const [eventKinds, setEventKinds] = useState<Set<string>>(new Set());
+  const [eventFreeOnly, setEventFreeOnly] = useState(false);
+  const [eventsFailed, setEventsFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const chipsRef = useRef<HTMLElement>(null);
   const [chipFade, setChipFade] = useState({ left: false, right: false });
@@ -203,6 +244,10 @@ export function App() {
   const [matchesSeenAt, setMatchesSeenAt] = useState(0);
   // admins can flip the carousel into a review queue of hidden draft spots
   const [showDrafts, setShowDrafts] = useState(false);
+  // ...and the events deck into a queue of pending events, each opening an editor
+  const [showReview, setShowReview] = useState(false);
+  const [pendingEvents, setPendingEvents] = useState<HappeningReview[] | null>(null);
+  const [reviewing, setReviewing] = useState<HappeningReview | null>(null);
 
   const reportWriteError = useCallback((e: unknown) => {
     if (import.meta.env.DEV) console.warn("write error:", e); // detail for devs only
@@ -462,7 +507,7 @@ export function App() {
   // is dead weight for the (majority) of visits that never type a query.
   const [FuseCtor, setFuseCtor] = useState<typeof Fuse | null>(null);
   useEffect(() => {
-    if (!query.trim() || FuseCtor) return;
+    if ((!query.trim() && !eventQuery.trim()) || FuseCtor) return;
     let live = true;
     void import("fuse.js").then(
       (m) => live && setFuseCtor(() => m.default),
@@ -471,7 +516,7 @@ export function App() {
     return () => {
       live = false;
     };
-  }, [query, FuseCtor]);
+  }, [query, eventQuery, FuseCtor]);
 
   const fuse = useMemo(
     () =>
@@ -744,6 +789,123 @@ export function App() {
     [saved, spotsById],
   );
 
+  // Fetched the first time the events tab is opened, not on page load: the
+  // spots deck is the landing view and shouldn't wait on a second query.
+  useEffect(() => {
+    if (deck !== "events" || happenings) return;
+    fetchHappenings()
+      .then(setHappenings)
+      // Failing into an empty array would render "nothing on yet" — a broken
+      // query and a quiet week must not look the same.
+      .catch(() => setEventsFailed(true));
+  }, [deck, happenings]);
+
+  // Same Fuse instance policy as spots: loaded on the first keystroke, with a
+  // substring fallback so search still works if the chunk never arrives.
+  const eventFuse = useMemo(
+    () =>
+      FuseCtor && happenings
+        ? new FuseCtor(dedupe(happenings), {
+            keys: [
+              { name: "title", weight: 3 },
+              { name: "venue_name", weight: 2 },
+              { name: "tags", weight: 1 },
+              { name: "summary", weight: 0.5 },
+            ],
+            threshold: 0.4,
+            ignoreLocation: true,
+          })
+        : null,
+    [FuseCtor, happenings],
+  );
+
+  // The review queue is fetched only for admins on the events deck: a handful
+  // of rows, and it doubles as the menu's count.
+  useEffect(() => {
+    if (!isAdmin || deck !== "events" || pendingEvents) return;
+    fetchPendingHappenings().then(setPendingEvents).catch(reportWriteError);
+  }, [isAdmin, deck, pendingEvents, reportWriteError]);
+
+  useEffect(() => {
+    if (!isAdmin) setShowReview(false);
+  }, [isAdmin]);
+
+  const events = useMemo(() => {
+    // In review mode every row shows, undeduped — a reviewer has to see the
+    // duplicate to reject it.
+    const source = showReview ? pendingEvents : happenings;
+    if (!source) return [];
+    const now = new Date();
+    let list = (showReview ? source : dedupe(source)).filter(
+      (h) =>
+        matchesWhen(h, eventWhen, now) &&
+        matchesKinds(h, eventKinds) &&
+        (!eventFreeOnly || isFree(h)),
+    );
+    const q = eventQuery.trim();
+    if (q) {
+      // Fuse indexes the published deck only; the queue falls back to substring.
+      const hits = eventFuse && !showReview
+        ? new Set(eventFuse.search(q).map((r) => r.item.id))
+        : null;
+      const needle = q.toLowerCase();
+      list = list.filter((h) =>
+        hits
+          ? hits.has(h.id)
+          : `${h.title ?? ""} ${h.venue_name ?? ""} ${h.summary ?? ""}`
+              .toLowerCase()
+              .includes(needle),
+      );
+    }
+    return list;
+  }, [happenings, pendingEvents, showReview, eventWhen, eventKinds, eventFreeOnly, eventQuery, eventFuse]);
+
+  // Any filter change re-aims the deck at the first match rather than leaving
+  // it parked on an index that now points at something else.
+  useEffect(() => {
+    setEventIndex(0);
+  }, [eventWhen, eventKinds, eventFreeOnly, eventQuery, showReview]);
+
+  const toggleEventKind = (key: string) =>
+    setEventKinds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  /**
+   * Same idea as the spots dice, minus the "skip what you've been to" step —
+   * an event happens once, so there's no visited set to avoid. It does refuse
+   * to land on the card already showing, which a plain random pick does about
+   * one time in N and reads as the button being broken.
+   */
+  const surpriseEvent = useCallback(() => {
+    if (!events.length) return;
+    void track("surprise_event");
+    if (events.length === 1) {
+      setEventIndex(0);
+      return;
+    }
+    let pick = eventIndex;
+    while (pick === eventIndex) pick = Math.floor(Math.random() * events.length);
+    setEventIndex(pick);
+  }, [events, eventIndex]);
+
+  const clearEventFilters = () => {
+    setEventQuery("");
+    setEventWhen("upcoming");
+    setEventKinds(new Set());
+    setEventFreeOnly(false);
+  };
+  const eventFiltersOn =
+    eventQuery.trim() !== "" || eventWhen !== "upcoming" || eventKinds.size > 0 || eventFreeOnly;
+  const currentEvent = events[Math.min(eventIndex, Math.max(events.length - 1, 0))];
+
+  const goEvent = (delta: number) => {
+    if (!events.length) return;
+    setEventIndex((i) => (i + delta + events.length) % events.length);
+  };
+
   // jump the carousel to a specific spot (clearing filters first if it's hidden)
   const goToSpot = useCallback(
     (placeId: string) => {
@@ -864,6 +1026,9 @@ export function App() {
               showDrafts={showDrafts}
               onAddSpot={() => setEditing({ mode: "create" })}
               onToggleDrafts={() => setShowDrafts((d) => !d)}
+              reviewCount={deck === "events" ? (pendingEvents?.length ?? 0) : null}
+              showReview={showReview}
+              onToggleReview={() => setShowReview((r) => !r)}
               onOpenTeam={() => setTeamOpen(true)}
             />
           )}
@@ -878,6 +1043,31 @@ export function App() {
         </div>
       </header>
 
+      <div className="deck-tabs" role="tablist" aria-label="What to browse">
+        <button
+          role="tab"
+          className="deck-tab"
+          aria-selected={deck === "spots"}
+          onClick={() => setDeck("spots")}
+        >
+          Spots
+          {spots && <span className="deck-tab-count">{spots.length}</span>}
+        </button>
+        <button
+          role="tab"
+          className="deck-tab"
+          aria-selected={deck === "events"}
+          onClick={() => {
+            setDeck("events");
+            void track("events_tab");
+          }}
+        >
+          Events
+          {happenings && <span className="deck-tab-count">{events.length}</span>}
+        </button>
+      </div>
+
+      {deck === "spots" && (
       <div className="filtermenu">
         {filtersOpen && (
           <div className="filter-scrim" onClick={() => setFiltersOpen(false)} aria-hidden="true" />
@@ -946,6 +1136,9 @@ export function App() {
       </div>
       </div>
 
+      )}
+
+      {deck === "spots" && (
       <section
         ref={chipsRef}
         className={
@@ -964,8 +1157,115 @@ export function App() {
           </button>
         ))}
       </section>
+      )}
 
-      {!spots ? (
+      {deck === "events" && !eventsFailed && (
+        <>
+          <section className="controls event-controls">
+            <div className="ctrl ctrl-search">
+              <label htmlFor="event-search">Search</label>
+              <input
+                id="event-search"
+                className="search-input"
+                type="text"
+                placeholder="afro house, rooftop, Anki Liquor…"
+                value={eventQuery}
+                onChange={(e) => setEventQuery(e.target.value)}
+              />
+            </div>
+            <div className="ctrl">
+              <label>When</label>
+              <Dropdown
+                value={eventWhen}
+                onChange={(v) => setEventWhen(v as EventWhen)}
+                options={EVENT_WHEN_OPTIONS}
+                ariaLabel="When"
+              />
+            </div>
+            <div className="ctrl-spacer" />
+            {/* plain .surprise-wrap, not the desktop/mobile pair the spots bar
+                uses: the events controls don't collapse, so one button serves
+                every width */}
+            <span className="surprise-wrap">
+              <DiceButton onClick={surpriseEvent} />
+            </span>
+          </section>
+
+          <section className="cat-chips event-chips">
+            {EVENT_KINDS.map((kind) => (
+              <button
+                key={kind.key}
+                className={"cat-chip" + (eventKinds.has(kind.key) ? " on" : "")}
+                onClick={() => toggleEventKind(kind.key)}
+              >
+                {kind.label}
+              </button>
+            ))}
+            {/* Free is a chip rather than a price dropdown: only 28% of posts
+                state a price at all, so bands would filter on missing data. */}
+            <button
+              className={"cat-chip" + (eventFreeOnly ? " on" : "")}
+              onClick={() => setEventFreeOnly((v) => !v)}
+            >
+              Free
+            </button>
+          </section>
+        </>
+      )}
+
+      {deck === "events" ? (
+        eventsFailed ? (
+          <div className="noresults">
+            Couldn't load events. Check your connection and try again.
+          </div>
+        ) : !happenings ? (
+          <div className="spot-stage">
+            <SkeletonCard />
+          </div>
+        ) : currentEvent ? (
+          <div className="spot-stage">
+            {showReview && (
+              <button
+                type="button"
+                className="spot-edit-fab"
+                aria-label={`Review ${currentEvent.title ?? "event"}`}
+                title="Review this event"
+                onClick={() => setReviewing(currentEvent as HappeningReview)}
+              >
+                <PencilIcon />
+              </button>
+            )}
+            <Suspense fallback={<SkeletonCard />}>
+              <EventCard
+                happening={currentEvent}
+                index={Math.min(eventIndex, events.length - 1)}
+                total={events.length}
+                onPrev={() => goEvent(-1)}
+                onNext={() => goEvent(1)}
+              />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="noresults">
+            {showReview ? (
+              <>
+                Nothing waiting for review.{" "}
+                <button onClick={() => setShowReview(false)}>Show published</button>
+              </>
+            ) : eventFiltersOn ? (
+              <>
+                No events match these filters.{" "}
+                <button onClick={clearEventFilters}>Clear filters</button>
+              </>
+            ) : (
+              <>
+                Nothing on the calendar yet. We list events as the city
+                announces them — most land only a few days ahead.
+              </>
+            )}
+          </div>
+        )
+      ) : !spots ? (
         <div className="spot-stage">
           <SkeletonCard />
         </div>
@@ -1004,6 +1304,10 @@ export function App() {
         </div>
       )}
 
+      {/* Saved spots, our visit log and the community feed are all about spots;
+          they'd be non-sequiturs under the events deck. */}
+      {deck === "spots" && (
+      <>
       {user && savedList.length > 0 && (
         <section className="saved-section">
           <div className="vs-head">
@@ -1107,6 +1411,25 @@ export function App() {
           </div>
           <CommunityTable entries={community} spotsById={spotsById} />
         </section>
+      )}
+      </>
+      )}
+
+      {reviewing && user && (
+        <Suspense fallback={null}>
+          <EventEditor
+            happening={reviewing}
+            userId={user.id}
+            onClose={() => setReviewing(null)}
+            onDecided={(verdict) => {
+              setReviewing(null);
+              // Refetch both: a "save for later" may have changed the date, and a
+              // publish belongs in the public deck immediately.
+              setPendingEvents(null);
+              if (verdict === "published") setHappenings(null);
+            }}
+          />
+        </Suspense>
       )}
 
       {editing && user && (

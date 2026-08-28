@@ -159,3 +159,65 @@ export async function coverVariantsExist(placeId: string): Promise<boolean> {
   }
   return true;
 }
+
+/* ------------------------------------------------------------------ */
+/* event flyers                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Flyers live under a prefix in the same public bucket rather than a bucket of
+ * their own: identical access rules, identical cache policy, one thing to
+ * create and configure.
+ */
+export const FLYER_PREFIX = "happenings";
+
+/** Public URL for a happening's flyer at a given width (or the original). */
+export function flyerUrl(happeningId: string, width?: number): string {
+  const name = width ? `${happeningId}-${width}.webp` : `${happeningId}.jpg`;
+  return coverPublicUrl(`${FLYER_PREFIX}/${name}`);
+}
+
+/**
+ * Copy a Telegram flyer into Storage and return its permanent URL.
+ *
+ * Telegram's CDN links die within about a day — measured, not assumed: of 14
+ * stored flyers, only the two posted that same day still resolved. The page at
+ * t.me/s/<channel> always re-issues fresh links for the same posts, so a flyer
+ * is recoverable long after its first URL expires; that's what makes this
+ * re-runnable rather than a race against the clock.
+ */
+export async function rehostFlyer(
+  happeningId: string,
+  srcUrl: string,
+): Promise<string | null> {
+  let bytes: ArrayBuffer;
+  let contentType: string;
+  try {
+    const res = await fetch(srcUrl);
+    if (!res.ok) return null; // already expired — a later run picks it up again
+    contentType = res.headers.get("content-type") ?? "image/jpeg";
+    bytes = await res.arrayBuffer();
+    if (bytes.byteLength === 0) return null;
+  } catch {
+    return null;
+  }
+
+  await putCover(`${FLYER_PREFIX}/${happeningId}.jpg`, bytes, contentType);
+  // Variants are best-effort: a decode failure must not lose the flyer itself.
+  try {
+    for (const width of COVER_VARIANT_WIDTHS) {
+      const webp = await sharp(Buffer.from(bytes))
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 78 })
+        .toBuffer();
+      await putCover(
+        `${FLYER_PREFIX}/${happeningId}-${width}.webp`,
+        new Uint8Array(webp),
+        "image/webp",
+      );
+    }
+  } catch {
+    /* original is stored; the app falls back to it when a variant 404s */
+  }
+  return flyerUrl(happeningId);
+}
