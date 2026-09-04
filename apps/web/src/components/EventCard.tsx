@@ -9,6 +9,7 @@ import {
   flyerSrcSet,
   heading,
   priceLabel,
+  spanLabel,
   timeLabel,
 } from "../lib/happenings";
 import { useSwipeDeck } from "../lib/swipe";
@@ -152,7 +153,9 @@ export function EventCard({
               }}
             />
           )}
-          <span className="cover-area">{dayLabel(happening.starts_at)}</span>
+          <span className="cover-area">
+            {spanLabel(happening.starts_at, happening.ends_at) ?? dayLabel(happening.starts_at)}
+          </span>
           {time && <span className="cover-count">{time}</span>}
           {hint && (
             <span className="swipe-hint" aria-hidden="true">

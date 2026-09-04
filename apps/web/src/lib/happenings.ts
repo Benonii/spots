@@ -185,6 +185,28 @@ export function countdown(iso: string, now = new Date()): string {
   return weeks === 1 ? "in a week" : `in ${weeks} weeks`;
 }
 
+/**
+ * The badge for an event spanning more than one Addis day: "22 Aug – 10 Sep"
+ * before it starts, "Until 10 Sep" once it's running. Null for everything
+ * else — a single-day event's start date says it all, and without this an
+ * ongoing exhibition wears its start date and looks stale.
+ */
+export function spanLabel(
+  starts_at: string,
+  ends_at: string | null,
+  now = new Date(),
+): string | null {
+  if (!ends_at) return null;
+  const startKey = addisDayKey(starts_at);
+  if (addisDayKey(ends_at) <= startKey) return null;
+  const short = (iso: string) => {
+    const d = addisClock(iso);
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  };
+  if (addisDayKey(now.toISOString()) > startKey) return `Until ${short(ends_at)}`;
+  return `${short(starts_at)} – ${short(ends_at)}`;
+}
+
 /** "SAT 29 AUG" — the date as the card's headline. */
 export function dateStamp(iso: string): { weekday: string; day: string; month: string } {
   const d = addisClock(iso);

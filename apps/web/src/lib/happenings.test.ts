@@ -13,6 +13,7 @@ import {
 import {
   flyerSrcSet,
   priceLabel,
+  spanLabel,
   startOfAddisToday,
   timeLabel,
 } from "./happenings";
@@ -175,6 +176,24 @@ describe("countdown", () => {
   // An all-day event that opened this morning is still worth showing.
   test("something already started reads as on now", () => {
     expect(countdown("2026-08-20T19:00:00+03:00", NOW)).toBe("On now");
+  });
+});
+
+describe("spanLabel", () => {
+  const starts = "2026-08-22T11:00:00+03:00";
+
+  test("null without an end, or when it ends the same day", () => {
+    expect(spanLabel(starts, null, NOW)).toBeNull();
+    expect(spanLabel(starts, "2026-08-22T16:30:00+03:00", NOW)).toBeNull();
+  });
+
+  test("shows the range before it starts", () => {
+    expect(spanLabel(starts, "2026-09-10T18:00:00+03:00", NOW)).toBe("22 Aug – 10 Sep");
+  });
+
+  test("shows only the end once it's running", () => {
+    const during = new Date("2026-09-04T09:00:00Z");
+    expect(spanLabel(starts, "2026-09-10T18:00:00+03:00", during)).toBe("Until 10 Sep");
   });
 });
 
