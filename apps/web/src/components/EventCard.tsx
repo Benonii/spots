@@ -112,6 +112,11 @@ export function EventCard({
   const time = timeLabel(happening.starts_at);
   const price = priceLabel(happening);
   const stamp = dateStamp(happening.starts_at);
+  // spanLabel is non-null exactly when the event crosses into another day
+  const endStamp =
+    happening.ends_at && spanLabel(happening.starts_at, happening.ends_at)
+      ? dateStamp(happening.ends_at)
+      : null;
   const soon = countdown(happening.starts_at);
 
   const ticketHost = happening.ticket_url
@@ -229,6 +234,18 @@ export function EventCard({
                   <b>{stamp.weekday}</b>
                   {stamp.month}
                 </span>
+                {endStamp && (
+                  <>
+                    <span className="event-dash" aria-hidden="true">
+                      –
+                    </span>
+                    <span className="event-daynum">{endStamp.day}</span>
+                    <span className="event-daytext">
+                      <b>{endStamp.weekday}</b>
+                      {endStamp.month}
+                    </span>
+                  </>
+                )}
               </div>
               <div className="meta-sub">
                 {time ? `${time} · ${soon}` : `${soon} · time not announced`}
